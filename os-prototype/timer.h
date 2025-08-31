@@ -2,17 +2,17 @@
 
 
 class Timer {
-	float lenght, time; 
+	float length, time; 
 	bool timeout;
 public :
-	Timer(float lenght) : lenght(0), time(0) {
+	Timer (float length) : length(length), time(0), timeout(false) {
 
 	}
 
 	void step(float deltaTime) {
 		time += deltaTime;
-		if (time > lenght) {
-			time -= lenght;
+		if (time > length) {
+			time -= length;
 			timeout = true;
 		}
 	}
@@ -25,8 +25,8 @@ public :
 		return time;
 	}
 
-	float getLenght() const {
-		return lenght;
+	float getLength() const {
+		return length;
 	}
 
 	void reset() {
