@@ -5,9 +5,7 @@ class Timer {
 	float lenght, time; 
 	bool timeout;
 public :
-	Timer(float lenght) : lenght(0), time(0) {
-
-	}
+	Timer(float lenght) : lenght(lenght), time(0), timeout(false) {}
 
 	void step(float deltaTime) {
 		time += deltaTime;
