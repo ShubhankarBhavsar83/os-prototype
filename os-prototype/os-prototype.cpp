@@ -155,7 +155,7 @@ int main(int argc, char* argv[])
 
 		 //sprite loading
 		const float spriteSizeHorizontal = 80;
-		const float spriteSizeVertical = 97;
+		const float spriteSizeVertical = 96;
 		const float spriteSize = 32;
 		
 
