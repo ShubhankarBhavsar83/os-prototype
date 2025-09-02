@@ -35,26 +35,39 @@ struct GameState {
 
 struct Resources {
 	const int ANIM_PLAYER_IDLE = 0;
-	vector<Animation> playerAnims;
-	vector<SDL_Texture *> textures;
-	SDL_Texture *idleTex;
+	const int ANIM_PLAYER_RUN_RIGHT = 1;
+	const int ANIM_PLAYER_RUN_LEFT = 2;
+	const int ANIM_PLAYER_RUN_UP = 3;
+	const int ANIM_PLAYER_RUN_DOWN = 4;
 
-	SDL_Texture* loadTexture(SDL_Renderer *renderer,const string &filepath) {
-		// game assets
-		SDL_Texture *tex = IMG_LoadTexture(renderer, filepath.c_str());
+	vector<Animation> playerAnimations;
+
+	vector <SDL_Texture*> textures;
+	SDL_Texture* texIdle;
+	SDL_Texture* texRunRight;
+	SDL_Texture* texRunLeft;
+	SDL_Texture* texRunUp;
+	SDL_Texture* texRunDown;
+
+
+	SDL_Texture* loadTexture(SDL_Renderer* renderer, const string& filepath) {
+
+		SDL_Texture* tex = IMG_LoadTexture(renderer, filepath.c_str());
 		SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
 		textures.push_back(tex);
 		return tex;
-
-		if (!tex) {
-			std::cerr << "Failed to load texture: " << filepath << "\nError: " << SDL_GetError() << std::endl;
-		}
 	}
 
 	void load(SDLState& state) {
-		playerAnims.resize(5);
-		playerAnims[ANIM_PLAYER_IDLE] = Animation(8, 1.6f);
-		idleTex = loadTexture(state.renderer, "assets/player_assets/run_right.png");
+		playerAnimations.resize(5);
+		playerAnimations[ANIM_PLAYER_IDLE] = Animation(8, 1.6);
+
+		texIdle = loadTexture(state.renderer, "assets/player_assets/idle_down_debug.png");
+		texRunRight = IMG_LoadTexture(state.renderer, "assets/player_assets/debug/run_right_debug.png");
+		texRunLeft = IMG_LoadTexture(state.renderer, "assets/player_assets/debug/run_left_debug.png");
+		texRunUp = IMG_LoadTexture(state.renderer, "assets/player_assets/debug/run_up_debug.png");
+		texRunDown = IMG_LoadTexture(state.renderer, "assets/player_assets/debug/run_down_debug.png");
+
 	}
 
 	void unload() {
@@ -66,9 +79,9 @@ struct Resources {
 
 };
 
-bool initialize(SDLState & state);
-void cleanup(SDLState & state);
-void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float &deltaTime);
+bool initialize(SDLState& state);
+void cleanup(SDLState& state);
+void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& deltaTime);
 
 int main(int argc, char* argv[])
 {
@@ -108,10 +121,11 @@ int main(int argc, char* argv[])
 	//bool moving = false; // animation switching from move to idle --     ///  -- todo - manage movement animation
 
 	const bool* keys = SDL_GetKeyboardState(nullptr);
-	float playerX = (float)(state.logW / 2);
-	float playerY = (float)(state.logH / 2);
-	bool flipHorizontal = false; // true =  left , false = right
-	bool flipVertical = false; // true =  up , fale = left
+	//float playerX = (float)(state.logW / 2);
+	//float playerY = (float)(state.logH / 2);
+	//bool verticalOrientation = false; // false = down, true = up
+	//bool horizontalOrientation = false; // false = right, true = left
+
 
 	// game loop
 	bool runTopLoop = true;
@@ -119,7 +133,6 @@ int main(int argc, char* argv[])
 	while (runTopLoop) {
 		uint64_t nowTime = SDL_GetTicks();
 		float deltaTime = (nowTime - previousTime) / 1000.0f;
-		
 		SDL_Event event{ 0 };
 		while (SDL_PollEvent(&event)) {
 			switch (event.type) {
@@ -172,36 +185,16 @@ int main(int argc, char* argv[])
 			}
 		}
 
-		playerX += moveHorizontal * deltaTime;
-		playerY += moveVertical * deltaTime;
-
 
 		// render tasks
 		SDL_SetRenderDrawColor(state.renderer, 128, 128, 128, 255);
 		SDL_RenderClear(state.renderer);
 
-		// sprite loading
-		const float spriteSizeHorizontal = 22;
-		const float spriteSizeVertical = 36;
-		SDL_FRect src{
-			.x = 0,
-			.y = 0,
-			.w = spriteSizeHorizontal * 3,
-			.h = spriteSizeVertical * 3
-		};
-		SDL_FRect dst{
-			.x = playerX,
-			.y = playerY,
-			.w = spriteSizeHorizontal,
-			.h = spriteSizeVertical
-		};
-
-		//SDL_RenderTexture(state.renderer, idleTex, &src, &dst);
 
 		// draw layer wise objects
 		for (auto& layer : gs.layers) {
-			for (GameObject &obj : layer) {
-				drawObject(state, gs, obj, deltaTime );
+			for (GameObject& obj : layer) {
+				drawObject(state, gs, obj, deltaTime);
 			}
 		}
 
@@ -217,7 +210,7 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-bool initialize(SDLState & state) {
+bool initialize(SDLState& state) {
 
 	bool initSuccess = true;
 
@@ -249,20 +242,19 @@ bool initialize(SDLState & state) {
 	return initSuccess;
 }
 
-void cleanup(SDLState & state) {
+void cleanup(SDLState& state) {
 	SDL_DestroyRenderer(state.renderer);
 	SDL_DestroyWindow(state.window);
 	SDL_Quit();
-	
 }
 
-void drawObject(const SDLState &state, GameState &gs, GameObject &obj, float &deltaTime) {
+void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& deltaTime) {
 
 
 	const float spriteWidth = 96.0f;
 	const float spriteHeight = 80.0f;
 
-	
+
 
 	float srcX = obj.currentAnimation != -1 ? obj.animations[obj.currentAnimation].currentFrame() * spriteWidth : 0.0f;
 
