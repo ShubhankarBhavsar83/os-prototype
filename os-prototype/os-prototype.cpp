@@ -18,6 +18,10 @@ struct SDLState {
 	SDL_Window* window;
 	SDL_Renderer* renderer;
 	int sc_width, sc_height, logW, logH;
+	const bool* keys;
+	SDLState() : keys(SDL_GetKeyboardState(nullptr)) {
+
+	}
 
 };
 
@@ -60,9 +64,9 @@ struct Resources {
 
 	void load(SDLState &state) {
 		playerAnimations.resize(5);
-		playerAnimations[ANIM_PLAYER_IDLE] = Animation(8, 1.6);
+		playerAnimations[ANIM_PLAYER_IDLE] = Animation(8, 1.0);
 
-		texIdle = loadTexture(state.renderer, "assets/player_assets/idle_down_debug.png");
+		texIdle = loadTexture(state.renderer, "assets/player_assets/idle_down.png");
 		texRunRight = IMG_LoadTexture(state.renderer, "assets/player_assets/debug/run_right_debug.png");
 		texRunLeft = IMG_LoadTexture(state.renderer, "assets/player_assets/debug/run_left_debug.png");
 		texRunUp = IMG_LoadTexture(state.renderer, "assets/player_assets/debug/run_up_debug.png");
@@ -82,12 +86,13 @@ struct Resources {
 bool initialize(SDLState & state);
 void cleanup(SDLState & state);
 void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float &deltaTime);
+void update(const SDLState& state, GameState& gs, Resources& res, GameObject& obj, float deltaTime);
 
 int main(int argc, char* argv[])
 {
 	cout << "App Start..." << endl;
 
-	SDLState state{ 0 };
+	SDLState state;
 
 	state.sc_width = 1280;
 	state.sc_height = 720;
@@ -114,17 +119,12 @@ int main(int argc, char* argv[])
 	player.texture = res.texIdle;
 	player.animations = res.playerAnimations;
 	player.currentAnimation = res.ANIM_PLAYER_IDLE;
+	//player.acceleration = glm::vec2(0, 100);
+	player.maxSpeedX = 100;
+	player.maxSpeedY = 100;
+
+
 	gs.layers[LAYER_IDX_CHARACTERS].push_back(player);
-	float srcx = 0.0f;
-
-	char orientation = '3'; // 1 = up, 2 = right, 3 = down, 4 = left.
-	//bool moving = false; // animation switching from move to idle --     ///  -- todo - manage movement animation
-
-	const bool* keys = SDL_GetKeyboardState(nullptr);
-	//float playerX = (float)(state.logW / 2);
-	//float playerY = (float)(state.logH / 2);
-	//bool verticalOrientation = false; // false = down, true = up
-	//bool horizontalOrientation = false; // false = right, true = left
 
  
 	// game loop
@@ -147,38 +147,11 @@ int main(int argc, char* argv[])
 			}
 		}
 
-		////movement 
-		////  todo - update to switch statement
-		//float moveHorizontal = 0;
-		//float moveVertical = 0;
-		//if (keys[SDL_SCANCODE_A]) {
-		//	moveHorizontal += -100.0f;
-		//	//horizontalOrientation = true;
-		//	orientation = '4';
-		//}
-		//if (keys[SDL_SCANCODE_D]) {
-		//	moveHorizontal += 100.0f;
-		//	//horizontalOrientation = false;
-		//	orientation = '2';
-		//}
-		//if (keys[SDL_SCANCODE_W]) {
-		//	moveVertical += -100.0f;
-		//	//verticalOrientation = true;
-		//	orientation = '1';
-		//}
-		//if (keys[SDL_SCANCODE_S]) {
-		//	moveVertical += 100.0f;
-		//	//verticalOrientation = false;
-		//	orientation = '3';
-		//}
-
-		//playerX += moveHorizontal * deltaTime;
-		//playerY += moveVertical * deltaTime;
-
-
 		// update game objects
 		for (auto& layer : gs.layers) {
 			for (GameObject& obj : layer) {
+
+				update(state, gs, res, obj, deltaTime);
 				if (obj.currentAnimation != -1) {
 					obj.animations[obj.currentAnimation].step(deltaTime);
 				}
@@ -194,7 +167,7 @@ int main(int argc, char* argv[])
 		// draw layer wise objects
 		for (auto& layer : gs.layers) {
 			for (GameObject &obj : layer) {
-				drawObject(state, gs, obj, deltaTime );
+				drawObject(state, gs, obj, deltaTime);
 			}
 		}
 
@@ -276,32 +249,110 @@ void drawObject(const SDLState &state, GameState &gs, GameObject &obj, float &de
 
 	SDL_RenderTexture(state.renderer, obj.texture, &src, &dst);
 
+}
+
+void update(const SDLState& state, GameState& gs, Resources& res, GameObject& obj, float deltaTime) {
+
+	if (obj.type == ObjectType::player) {
+
+		float accX = 0.0;
+		float accY = 0.0;
+
+		struct MoveTest {
+			float X = 0.0;
+			float Y = 0.0;
+		};
+		
+		MoveTest mt;
+
+		////movement 
+		float HorizontalDirection = 0;
+		float VerticalDirection = 0;
+		if (state.keys[SDL_SCANCODE_A]) {
+			//HorizontalDirection += 1;
+			accX += -100;
+		}
+		if (state.keys[SDL_SCANCODE_D]) {
+			//HorizontalDirection += 1;
+			accX += 100;
+		}
+		if (state.keys[SDL_SCANCODE_W]) {
+			//VerticalDirection += 1;
+			accY += -100;
+		}
+		if (state.keys[SDL_SCANCODE_S]) {
+
+			//VerticalDirection += 1;
+			accY += 100;
+
+		}
+		if ((mt.X != 0) || (mt.Y != 0)) {
+			obj.directionHorizontal = mt.X;
+			obj.directionVertical = mt.Y;
+		}
+
+		switch (obj.data.player.state) {
+	
+			case PlayerState::idle: {
+				if ((mt.X != 0) || (mt.Y != 0)) {
+					obj.data.player.state = PlayerState::running;
+				}
+				break;
+			}
+			case PlayerState::running: {
+				if ((mt.X == 0) && (mt.Y == 0)) {
+					obj.data.player.state = PlayerState::idle;
+				}
+				break;
+			}
+		}
 
 
-	//switch (orientation) {
-	//	case '1': {
-	//		//SDL_RenderTexture(state.renderer, res.texRunUp, &src, &dst);
-	//		SDL_RenderTexture(state.renderer, obj.texture, &src, &dst);
+		obj.acceleration = glm::vec2(accX, accY);
 
-	//		break;
-	//	}
-	//	case '2': {
-	//		//SDL_RenderTexture(state.renderer, res.texRunRight, &src, &dst);
-	//		SDL_RenderTexture(state.renderer, obj.texture, &src, &dst);
-	//		break;
-	//	}
-	//	case '3': {
-	//		//SDL_RenderTexture(state.renderer, res.texRunDown, &src, &dst);
-	//		SDL_RenderTexture(state.renderer, obj.texture, &src, &dst);
-	//		break;
-	//	}
-	//	case '4': {
-	//		//SDL_RenderTexture(state.renderer, res.texRunLeft, &src, &dst);
-	//		SDL_RenderTexture(state.renderer, obj.texture, &src, &dst);
-	//		break;
-	//	}
-	//}
 
-	//SDL_RenderTextureRotated(state.renderer, runRightTex, &src, &dst, 0, nullptr, (horizontalOrientation) ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+
+		// add acceleration to velocity 
+		obj.velocity += obj.acceleration * deltaTime;
+		obj.velocity += obj.acceleration * deltaTime;
+
+
+		//float veloX = obj.velocity + (VerticalDirection * obj.acceleration * deltaTime);
+
+		//if (std::abs(obj.velocity.x) > obj.maxSpeedX ) {
+		//	//obj.acceleration.x -= accX;
+		//	obj.velocity.x = ((std::abs(obj.acceleration.x)) / obj.acceleration.x)* obj.maxSpeedX;
+
+
+		//}
+		//else if (std::abs(obj.velocity.y) > obj.maxSpeedY) {
+		//	//obj.acceleration.y -= accY;
+		//	obj.velocity.y = (std::abs(obj.acceleration.y) / obj.acceleration.y) * obj.maxSpeedY;
+
+
+		//}
+
+
+		if (std::abs(obj.velocity.x) > obj.maxSpeedX) {
+			obj.velocity.x = (obj.velocity.x > 0 ? 1 : -1) * obj.maxSpeedX;
+		}
+		if (std::abs(obj.velocity.y) > obj.maxSpeedY) {
+			obj.velocity.y = (obj.velocity.y > 0 ? 1 : -1) * obj.maxSpeedY;
+		}
+
+		//cout << "------**-----" << endl;
+		//cout << accX << "- accel x" << endl;
+		//cout << accY << "- accel y" << endl;
+		//cout << obj.velocity.x << "- vel x" << endl;
+		//cout << obj.velocity.y << "- vel y" << endl;
+		//cout << obj.acceleration.x << "obj accel x" << endl;
+		//cout << obj.acceleration.y << "obj accel y" << endl;
+		//cout << "-------------" << endl;
+
+
+		// add velocity to position
+		obj.position += obj.velocity * deltaTime;
+
+	}
 
 }
