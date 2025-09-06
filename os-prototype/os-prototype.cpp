@@ -242,8 +242,6 @@ void drawObject(const SDLState &state, GameState &gs, GameObject &obj, float &de
 	SDL_FRect dst{
 		.x = obj.position.x,
 		.y = obj.position.y,
-		//.x = (float)state.logW / 2,
-		//.y = (float)state.logH / 2,
 		.w = spriteWidth * 0.50,
 		.h = spriteHeight * 0.50
 	};
@@ -301,6 +299,7 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 				}
 				else {
 
+					// deceleration for X movement
 					if (obj.velocity.x != 0) {
 						const float factor = obj.velocity.x > 0 ? accX = 650 : accX = -650;
 						float amount = factor * 500 /*base acceleration value*/ * deltaTime;
@@ -311,7 +310,7 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 								obj.velocity.x += amount;
 							}
 						}
-
+					// deceleration for Y movement
 					if (obj.velocity.y != 0) {
 						const float factor = obj.velocity.y > 0 ? accY = 650 : accY = -650;
 						float amount = factor * 500 /*base acceleration value*/ * deltaTime;
@@ -339,34 +338,12 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 		// add acceleration to velocity 
 		obj.velocity += obj.acceleration * deltaTime;
 
-		//obj.velocity += ms.X * obj.acceleration * deltaTime;
-		//obj.velocity += ms.Y * obj.acceleration * deltaTime;
-		//
-
-		//if (std::abs(obj.velocity.x) > obj.maxSpeedX ) {
-		//	obj.velocity.x = ((std::abs(obj.acceleration.x)) / obj.acceleration.x) * obj.maxSpeedX;
-		//}
-		//else if (std::abs(obj.velocity.y) > obj.maxSpeedY) {
-		//	obj.velocity.y = (std::abs(obj.acceleration.y) / obj.acceleration.y) * obj.maxSpeedY;
-		//}
-
-
-		//if (std::abs(obj.velocity.x) > obj.maxSpeedX) {
-		//	obj.velocity.x = ms.X * obj.maxSpeedX;
-		//}
-		//else if (std::abs(obj.velocity.y) > obj.maxSpeedY) {
-		//	obj.velocity.y = ms.Y * obj.maxSpeedY;
-		//}
-
-
-
 		if (std::abs(obj.velocity.x) > obj.maxSpeedX) {
 			obj.velocity.x = (obj.velocity.x > 0 ? 1 : -1) * obj.maxSpeedX;
 		}
 		if (std::abs(obj.velocity.y) > obj.maxSpeedY) {
 			obj.velocity.y = (obj.velocity.y > 0 ? 1 : -1) * obj.maxSpeedY;
 		}
-
 
 		// add velocity to position
 		obj.position += obj.velocity * deltaTime;
