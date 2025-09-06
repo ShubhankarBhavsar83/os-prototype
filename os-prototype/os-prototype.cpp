@@ -121,8 +121,8 @@ int main(int argc, char* argv[])
 	player.animations = res.playerAnimations;
 	player.currentAnimation = res.ANIM_PLAYER_IDLE;
 	//player.acceleration = glm::vec2(0, 100);
-	player.maxSpeedX = 100;
-	player.maxSpeedY = 100;
+	player.maxSpeedX = 50;
+	player.maxSpeedY = 50;
 
 
 	gs.layers[LAYER_IDX_CHARACTERS].push_back(player);
@@ -285,6 +285,9 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 
 		}
 
+		obj.acceleration = glm::vec2(accX, accY);
+
+
 		// todo- handle new impl
 		if ((ms.X != 0) || (ms.Y != 0)) {
 			obj.directionHorizontal = ms.X;
@@ -302,9 +305,10 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 					// deceleration for X movement
 					if (obj.velocity.x != 0) {
 						const float factor = obj.velocity.x > 0 ? accX = 650 : accX = -650;
-						float amount = factor * 500 /*base acceleration value*/ * deltaTime;
+						float amount = factor * 650 /*base acceleration value*/ * deltaTime;
 							if (std::abs(obj.velocity.x) < std::abs(amount)) {
 								obj.velocity.x = 0;
+								ms.X += 0;
 							}
 							else {
 								obj.velocity.x += amount;
@@ -313,9 +317,11 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 					// deceleration for Y movement
 					if (obj.velocity.y != 0) {
 						const float factor = obj.velocity.y > 0 ? accY = 650 : accY = -650;
-						float amount = factor * 500 /*base acceleration value*/ * deltaTime;
+						float amount = factor * 650 /*base acceleration value*/ * deltaTime;
 						if (std::abs(obj.velocity.y) < std::abs(amount)) {
 							obj.velocity.y = 0;
+							ms.Y += 0;
+
 						}
 						else {
 							obj.velocity.y += amount;
@@ -333,7 +339,6 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 		}
 
 
-		obj.acceleration = glm::vec2(accX, accY);
 
 		// add acceleration to velocity 
 		obj.velocity += obj.acceleration * deltaTime;
