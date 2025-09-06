@@ -1,5 +1,5 @@
 ﻿// os - prototype.cpp : Defines the entry point for the application.
-//
+// 1:05:30
 
 #include "os-prototype.h"
 #include <SDL3/SDL.h>
@@ -116,6 +116,7 @@ int main(int argc, char* argv[])
 	// player data
 	GameObject player;
 	player.type = ObjectType::player;
+	player.data.player = PlayerData();
 	player.texture = res.texIdle;
 	player.animations = res.playerAnimations;
 	player.currentAnimation = res.ANIM_PLAYER_IDLE;
@@ -258,49 +259,74 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 		float accX = 0.0;
 		float accY = 0.0;
 
-		struct MoveTest {
+		struct MoveSet {
 			float X = 0.0;
 			float Y = 0.0;
 		};
 		
-		MoveTest mt;
+		MoveSet ms;
 
 		////movement 
 		float HorizontalDirection = 0;
 		float VerticalDirection = 0;
 		if (state.keys[SDL_SCANCODE_A]) {
-			//HorizontalDirection += 1;
-			accX += -100;
+			ms.X += -1;
+			accX += -500;
 		}
 		if (state.keys[SDL_SCANCODE_D]) {
-			//HorizontalDirection += 1;
-			accX += 100;
+			ms.X += 1;
+			accX += 500;
 		}
 		if (state.keys[SDL_SCANCODE_W]) {
-			//VerticalDirection += 1;
-			accY += -100;
+			ms.Y += -1;
+			accY += -500;
 		}
 		if (state.keys[SDL_SCANCODE_S]) {
-
-			//VerticalDirection += 1;
-			accY += 100;
+			ms.Y += 1;
+			accY += 500;
 
 		}
-		if ((mt.X != 0) || (mt.Y != 0)) {
-			obj.directionHorizontal = mt.X;
-			obj.directionVertical = mt.Y;
+
+		// todo- handle new impl
+		if ((ms.X != 0) || (ms.Y != 0)) {
+			obj.directionHorizontal = ms.X;
+			obj.directionVertical = ms.Y;
 		}
 
 		switch (obj.data.player.state) {
 	
 			case PlayerState::idle: {
-				if ((mt.X != 0) || (mt.Y != 0)) {
+				if ((ms.X != 0) || (ms.Y != 0)) {
 					obj.data.player.state = PlayerState::running;
+				}
+				else {
+
+					if (obj.velocity.x != 0) {
+						const float factor = obj.velocity.x > 0 ? accX = 650 : accX = -650;
+						float amount = factor * 500 /*base acceleration value*/ * deltaTime;
+							if (std::abs(obj.velocity.x) < std::abs(amount)) {
+								obj.velocity.x = 0;
+							}
+							else {
+								obj.velocity.x += amount;
+							}
+						}
+
+					if (obj.velocity.y != 0) {
+						const float factor = obj.velocity.y > 0 ? accY = 650 : accY = -650;
+						float amount = factor * 500 /*base acceleration value*/ * deltaTime;
+						if (std::abs(obj.velocity.y) < std::abs(amount)) {
+							obj.velocity.y = 0;
+						}
+						else {
+							obj.velocity.y += amount;
+						}
+					}
 				}
 				break;
 			}
 			case PlayerState::running: {
-				if ((mt.X == 0) && (mt.Y == 0)) {
+				if ((ms.X == 0) && (ms.Y == 0)) {
 					obj.data.player.state = PlayerState::idle;
 				}
 				break;
@@ -310,27 +336,28 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 
 		obj.acceleration = glm::vec2(accX, accY);
 
-
-
 		// add acceleration to velocity 
 		obj.velocity += obj.acceleration * deltaTime;
-		obj.velocity += obj.acceleration * deltaTime;
 
-
-		//float veloX = obj.velocity + (VerticalDirection * obj.acceleration * deltaTime);
+		//obj.velocity += ms.X * obj.acceleration * deltaTime;
+		//obj.velocity += ms.Y * obj.acceleration * deltaTime;
+		//
 
 		//if (std::abs(obj.velocity.x) > obj.maxSpeedX ) {
-		//	//obj.acceleration.x -= accX;
-		//	obj.velocity.x = ((std::abs(obj.acceleration.x)) / obj.acceleration.x)* obj.maxSpeedX;
-
-
+		//	obj.velocity.x = ((std::abs(obj.acceleration.x)) / obj.acceleration.x) * obj.maxSpeedX;
 		//}
 		//else if (std::abs(obj.velocity.y) > obj.maxSpeedY) {
-		//	//obj.acceleration.y -= accY;
 		//	obj.velocity.y = (std::abs(obj.acceleration.y) / obj.acceleration.y) * obj.maxSpeedY;
-
-
 		//}
+
+
+		//if (std::abs(obj.velocity.x) > obj.maxSpeedX) {
+		//	obj.velocity.x = ms.X * obj.maxSpeedX;
+		//}
+		//else if (std::abs(obj.velocity.y) > obj.maxSpeedY) {
+		//	obj.velocity.y = ms.Y * obj.maxSpeedY;
+		//}
+
 
 
 		if (std::abs(obj.velocity.x) > obj.maxSpeedX) {
@@ -339,15 +366,6 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 		if (std::abs(obj.velocity.y) > obj.maxSpeedY) {
 			obj.velocity.y = (obj.velocity.y > 0 ? 1 : -1) * obj.maxSpeedY;
 		}
-
-		//cout << "------**-----" << endl;
-		//cout << accX << "- accel x" << endl;
-		//cout << accY << "- accel y" << endl;
-		//cout << obj.velocity.x << "- vel x" << endl;
-		//cout << obj.velocity.y << "- vel y" << endl;
-		//cout << obj.acceleration.x << "obj accel x" << endl;
-		//cout << obj.acceleration.y << "obj accel y" << endl;
-		//cout << "-------------" << endl;
 
 
 		// add velocity to position
