@@ -38,23 +38,22 @@ struct GameState {
 };
 
 struct Resources {
-	const int ANIM_PLAYER_IDLE = 0;
-	const int ANIM_PLAYER_RUN_RIGHT = 1;
-	const int ANIM_PLAYER_RUN_LEFT = 2;
-	const int ANIM_PLAYER_RUN_UP = 3;
-	const int ANIM_PLAYER_RUN_DOWN = 4;
+	const int ANIM_PLAYER_IDLE_RIGHT = 0;
+	const int ANIM_PLAYER_IDLE_LEFT = 1;
+	const int ANIM_PLAYER_IDLE_UP = 2;
+	const int ANIM_PLAYER_IDLE_DOWN = 3;
+
+	const int ANIM_PLAYER_RUN_RIGHT = 4;
+	const int ANIM_PLAYER_RUN_LEFT = 5;
+	const int ANIM_PLAYER_RUN_UP = 6;
+	const int ANIM_PLAYER_RUN_DOWN = 7;
 
 	vector<Animation> playerAnimations;
 
 	vector <SDL_Texture*> textures;
-	SDL_Texture* texIdle;
-	SDL_Texture* texRunRight;
-	SDL_Texture* texRunLeft;
-	SDL_Texture* texRunUp;
-	SDL_Texture* texRunDown;
+	SDL_Texture* texRunRight, * texRunLeft, * texRunUp, * texRunDown, * texIdleRight, * texIdleLeft, * texIdleUp, * texIdleDown;
 
-
-	SDL_Texture* loadTexture(SDL_Renderer *renderer, const string &filepath) {
+	SDL_Texture* loadTexture(SDL_Renderer* renderer, const string& filepath) {
 
 		SDL_Texture* tex = IMG_LoadTexture(renderer, filepath.c_str());
 		SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
@@ -62,15 +61,28 @@ struct Resources {
 		return tex;
 	}
 
-	void load(SDLState &state) {
-		playerAnimations.resize(5);
-		playerAnimations[ANIM_PLAYER_IDLE] = Animation(8, 1.0);
+	void load(SDLState& state) {
+		playerAnimations.resize(8);
+		playerAnimations[ANIM_PLAYER_IDLE_RIGHT] = Animation(8, 1.0);
+		playerAnimations[ANIM_PLAYER_IDLE_LEFT] = Animation(8, 1.0);
+		playerAnimations[ANIM_PLAYER_IDLE_UP] = Animation(8, 1.0);
+		playerAnimations[ANIM_PLAYER_IDLE_DOWN] = Animation(8, 1.0);
 
-		texIdle = loadTexture(state.renderer, "assets/player_assets/idle_down.png");
-		texRunRight = IMG_LoadTexture(state.renderer, "assets/player_assets/debug/run_right_debug.png");
-		texRunLeft = IMG_LoadTexture(state.renderer, "assets/player_assets/debug/run_left_debug.png");
-		texRunUp = IMG_LoadTexture(state.renderer, "assets/player_assets/debug/run_up_debug.png");
-		texRunDown = IMG_LoadTexture(state.renderer, "assets/player_assets/debug/run_down_debug.png");
+		playerAnimations[ANIM_PLAYER_RUN_RIGHT] = Animation(8, 1.0);
+		playerAnimations[ANIM_PLAYER_RUN_LEFT] = Animation(8, 1.0);
+		playerAnimations[ANIM_PLAYER_RUN_UP] = Animation(8, 1.0);
+		playerAnimations[ANIM_PLAYER_RUN_DOWN] = Animation(8, 1.0);
+
+
+		texIdleRight = loadTexture(state.renderer, "assets/player_assets/idle_right.png");
+		texIdleLeft = loadTexture(state.renderer, "assets/player_assets/idle_left.png");
+		texIdleUp = loadTexture(state.renderer, "assets/player_assets/idle_up.png");
+		texIdleDown = loadTexture(state.renderer, "assets/player_assets/idle_down.png");
+
+		texRunRight = IMG_LoadTexture(state.renderer, "assets/player_assets/run_right.png");
+		texRunLeft = IMG_LoadTexture(state.renderer, "assets/player_assets/run_left.png");
+		texRunUp = IMG_LoadTexture(state.renderer, "assets/player_assets/run_up.png");
+		texRunDown = IMG_LoadTexture(state.renderer, "assets/player_assets/run_down.png");
 
 	}
 
@@ -83,9 +95,9 @@ struct Resources {
 
 };
 
-bool initialize(SDLState & state);
-void cleanup(SDLState & state);
-void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float &deltaTime);
+bool initialize(SDLState& state);
+void cleanup(SDLState& state);
+void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& deltaTime);
 void update(const SDLState& state, GameState& gs, Resources& res, GameObject& obj, float deltaTime);
 
 int main(int argc, char* argv[])
@@ -117,9 +129,9 @@ int main(int argc, char* argv[])
 	GameObject player;
 	player.type = ObjectType::player;
 	player.data.player = PlayerData();
-	player.texture = res.texIdle;
+	player.texture = res.texIdleDown;
 	player.animations = res.playerAnimations;
-	player.currentAnimation = res.ANIM_PLAYER_IDLE;
+	player.currentAnimation = res.ANIM_PLAYER_IDLE_DOWN;
 	//player.acceleration = glm::vec2(0, 100);
 	player.maxSpeedX = 50;
 	player.maxSpeedY = 50;
@@ -127,7 +139,7 @@ int main(int argc, char* argv[])
 
 	gs.layers[LAYER_IDX_CHARACTERS].push_back(player);
 
- 
+
 	// game loop
 	bool runTopLoop = true;
 	uint64_t previousTime = SDL_GetTicks();
@@ -151,7 +163,6 @@ int main(int argc, char* argv[])
 		// update game objects
 		for (auto& layer : gs.layers) {
 			for (GameObject& obj : layer) {
-
 				update(state, gs, res, obj, deltaTime);
 				if (obj.currentAnimation != -1) {
 					obj.animations[obj.currentAnimation].step(deltaTime);
@@ -167,7 +178,7 @@ int main(int argc, char* argv[])
 
 		// draw layer wise objects
 		for (auto& layer : gs.layers) {
-			for (GameObject &obj : layer) {
+			for (GameObject& obj : layer) {
 				drawObject(state, gs, obj, deltaTime);
 			}
 		}
@@ -184,7 +195,7 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-bool initialize(SDLState & state) {
+bool initialize(SDLState& state) {
 
 	bool initSuccess = true;
 
@@ -216,19 +227,19 @@ bool initialize(SDLState & state) {
 	return initSuccess;
 }
 
-void cleanup(SDLState & state) {
+void cleanup(SDLState& state) {
 	SDL_DestroyRenderer(state.renderer);
 	SDL_DestroyWindow(state.window);
 	SDL_Quit();
 }
 
-void drawObject(const SDLState &state, GameState &gs, GameObject &obj, float &deltaTime) {
+void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& deltaTime) {
 
 
 	const float spriteWidth = 96.0f;
 	const float spriteHeight = 80.0f;
 
-	
+
 
 	float srcX = obj.currentAnimation != -1 ? obj.animations[obj.currentAnimation].currentFrame() * spriteWidth : 0.0f;
 
@@ -257,87 +268,117 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 		float accX = 0.0;
 		float accY = 0.0;
 
-		struct MoveSet {
+		struct MoveDirectionSet {
 			float X = 0.0;
 			float Y = 0.0;
 		};
-		
-		MoveSet ms;
+
+		MoveDirectionSet mds{ 0, 0 };
 
 		////movement 
 		float HorizontalDirection = 0;
 		float VerticalDirection = 0;
 		if (state.keys[SDL_SCANCODE_A]) {
-			ms.X += -1;
+			mds.X += -1;
 			accX += -500;
 		}
 		if (state.keys[SDL_SCANCODE_D]) {
-			ms.X += 1;
+			mds.X += 1;
 			accX += 500;
 		}
 		if (state.keys[SDL_SCANCODE_W]) {
-			ms.Y += -1;
+			mds.Y += -1;
 			accY += -500;
 		}
 		if (state.keys[SDL_SCANCODE_S]) {
-			ms.Y += 1;
+			mds.Y += 1;
 			accY += 500;
-
 		}
+
 
 		obj.acceleration = glm::vec2(accX, accY);
 
 
-		// todo- handle new impl
-		if ((ms.X != 0) || (ms.Y != 0)) {
-			obj.directionHorizontal = ms.X;
-			obj.directionVertical = ms.Y;
-		}
-
 		switch (obj.data.player.state) {
-	
-			case PlayerState::idle: {
-				if ((ms.X != 0) || (ms.Y != 0)) {
-					obj.data.player.state = PlayerState::running;
-				}
-				else {
 
-					// deceleration for X movement
-					if (obj.velocity.x != 0) {
-						const float factor = obj.velocity.x > 0 ? accX = 650 : accX = -650;
-						float amount = factor * 650 /*base acceleration value*/ * deltaTime;
-							if (std::abs(obj.velocity.x) < std::abs(amount)) {
-								obj.velocity.x = 0;
-								ms.X += 0;
-							}
-							else {
-								obj.velocity.x += amount;
-							}
-						}
-					// deceleration for Y movement
-					if (obj.velocity.y != 0) {
-						const float factor = obj.velocity.y > 0 ? accY = 650 : accY = -650;
-						float amount = factor * 650 /*base acceleration value*/ * deltaTime;
-						if (std::abs(obj.velocity.y) < std::abs(amount)) {
-							obj.velocity.y = 0;
-							ms.Y += 0;
-
-						}
-						else {
-							obj.velocity.y += amount;
-						}
+		case PlayerState::idle: {
+			if ((mds.X != 0) || (mds.Y != 0)) {
+				obj.data.player.state = PlayerState::running;
+			}
+			else {
+				// deceleration for X movement
+				if (obj.velocity.x != 0) {
+					const float factor = obj.velocity.x > 0 ? accX = 650 : accX = -650;
+					float amount = factor * 500 /*base acceleration value*/ * deltaTime;
+					if (std::abs(obj.velocity.x) < std::abs(amount)) {
+						obj.velocity.x = 0;
+					}
+					else {
+						obj.velocity.x += amount;
 					}
 				}
-				break;
-			}
-			case PlayerState::running: {
-				if ((ms.X == 0) && (ms.Y == 0)) {
-					obj.data.player.state = PlayerState::idle;
-				}
-				break;
-			}
-		}
+				// deceleration for Y movement
+				if (obj.velocity.y != 0) {
+					const float factor = obj.velocity.y > 0 ? accY = 650 : accY = -650;
+					float amount = factor * 500 /*base acceleration value*/ * deltaTime;
+					if (std::abs(obj.velocity.y) < std::abs(amount)) {
+						obj.velocity.y = 0;
 
+					}
+					else {
+
+						obj.velocity.y += amount;
+					}
+				}
+			}
+			break;
+		}
+		case PlayerState::running: {
+			if ((mds.X == 0) && (mds.Y == 0)) {
+				obj.data.player.state = PlayerState::idle;
+
+				if (obj.directionHorizontal > 0) {
+					obj.texture = res.texIdleRight;
+					obj.currentAnimation = res.ANIM_PLAYER_IDLE_RIGHT;
+				}
+				else if (obj.directionHorizontal < 0) {
+					obj.texture = res.texIdleLeft;
+					obj.currentAnimation = res.ANIM_PLAYER_IDLE_LEFT;
+				}
+				else if (obj.directionVertical < 0) {
+					obj.texture = res.texIdleUp;
+					obj.currentAnimation = res.ANIM_PLAYER_IDLE_UP;
+				}
+				else if (obj.directionVertical > 0) {
+					obj.texture = res.texIdleDown;
+					obj.currentAnimation = res.ANIM_PLAYER_IDLE_DOWN;
+				}
+			}
+			else {
+
+				obj.directionHorizontal = mds.X;
+				obj.directionVertical = mds.Y;
+
+				if (obj.directionHorizontal > 0) {
+					obj.texture = res.texRunRight;
+					obj.currentAnimation = res.ANIM_PLAYER_RUN_RIGHT;
+				}
+				else if (obj.directionHorizontal < 0) {
+					obj.texture = res.texRunLeft;
+					obj.currentAnimation = res.ANIM_PLAYER_RUN_LEFT;
+				}
+				else if (obj.directionVertical < 0) {
+					obj.texture = res.texRunUp;
+					obj.currentAnimation = res.ANIM_PLAYER_RUN_UP;
+				}
+				else if (obj.directionVertical > 0) {
+					obj.texture = res.texRunDown;
+					obj.currentAnimation = res.ANIM_PLAYER_RUN_DOWN;
+				}
+			}
+			break;
+		}
+		}
 
 
 		// add acceleration to velocity 
