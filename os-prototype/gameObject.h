@@ -44,7 +44,12 @@ struct GameObject {
 	float directionHorizontal; // -1 = left, 1 = right
 	float maxSpeedX;
 	float maxSpeedY;
-	//bool moving = false; // use maybe for movement -- tentitive 
+	float sprite_width;
+	float sprite_height;
+	float scale;
+
+	bool dynamic;
+	bool solid;
 
 	std::vector<Animation> animations;
 	int currentAnimation;
@@ -58,6 +63,11 @@ struct GameObject {
 		directionHorizontal = 1;
 		maxSpeedX = 0;
 		maxSpeedY = 0;
+		sprite_width = 0.0f;
+		sprite_height = 0.0f;
+		scale = 0.0f;
+		dynamic = false;
+		solid = false;
 
 		position = velocity = acceleration = glm::vec2(0);
 		currentAnimation = -1;

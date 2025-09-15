@@ -26,10 +26,14 @@ struct SDLState {
 };
 
 const size_t LAYER_IDX_LEVEL = 0;
-const size_t LAYER_IDX_CHARACTERS = 1;
+const size_t LAYER_IDX_FURNITURE = 1;
+const size_t LAYER_IDX_CHARACTERS = 2;
+const int MAP_ROWS = 25;
+const int MAP_COLS = 25;
+const int TILE_SIZE = 32;
 
 struct GameState {
-	array<vector<GameObject>, 2> layers;
+	array<vector<GameObject>, 3> layers;
 	int playerIndex;
 
 	GameState() {
@@ -51,7 +55,9 @@ struct Resources {
 	vector<Animation> playerAnimations;
 
 	vector <SDL_Texture*> textures;
-	SDL_Texture* texRunRight, * texRunLeft, * texRunUp, * texRunDown, * texIdleRight, * texIdleLeft, * texIdleUp, * texIdleDown;
+	SDL_Texture *texRunRight, *texRunLeft, *texRunUp, *texRunDown,
+				*texIdleRight, *texIdleLeft, *texIdleUp, *texIdleDown,
+				*texDirt, *texGrass, *texDirtPillar;
 
 	SDL_Texture* loadTexture(SDL_Renderer* renderer, const string& filepath) {
 
@@ -63,15 +69,15 @@ struct Resources {
 
 	void load(SDLState& state) {
 		playerAnimations.resize(8);
-		playerAnimations[ANIM_PLAYER_IDLE_RIGHT] = Animation(8, 1.0);
-		playerAnimations[ANIM_PLAYER_IDLE_LEFT] = Animation(8, 1.0);
-		playerAnimations[ANIM_PLAYER_IDLE_UP] = Animation(8, 1.0);
-		playerAnimations[ANIM_PLAYER_IDLE_DOWN] = Animation(8, 1.0);
+		playerAnimations[ANIM_PLAYER_IDLE_RIGHT] = Animation(8, 0.7);
+		playerAnimations[ANIM_PLAYER_IDLE_LEFT] = Animation(8, 0.7);
+		playerAnimations[ANIM_PLAYER_IDLE_UP] = Animation(8, 0.7);
+		playerAnimations[ANIM_PLAYER_IDLE_DOWN] = Animation(8, 0.7);
 
-		playerAnimations[ANIM_PLAYER_RUN_RIGHT] = Animation(8, 1.0);
-		playerAnimations[ANIM_PLAYER_RUN_LEFT] = Animation(8, 1.0);
-		playerAnimations[ANIM_PLAYER_RUN_UP] = Animation(8, 1.0);
-		playerAnimations[ANIM_PLAYER_RUN_DOWN] = Animation(8, 1.0);
+		playerAnimations[ANIM_PLAYER_RUN_RIGHT] = Animation(8, 0.7);
+		playerAnimations[ANIM_PLAYER_RUN_LEFT] = Animation(8, 0.7);
+		playerAnimations[ANIM_PLAYER_RUN_UP] = Animation(8, 0.7);
+		playerAnimations[ANIM_PLAYER_RUN_DOWN] = Animation(8, 0.7);
 
 
 		texIdleRight = loadTexture(state.renderer, "assets/player_assets/idle_right.png");
@@ -79,10 +85,15 @@ struct Resources {
 		texIdleUp = loadTexture(state.renderer, "assets/player_assets/idle_up.png");
 		texIdleDown = loadTexture(state.renderer, "assets/player_assets/idle_down.png");
 
-		texRunRight = IMG_LoadTexture(state.renderer, "assets/player_assets/run_right.png");
-		texRunLeft = IMG_LoadTexture(state.renderer, "assets/player_assets/run_left.png");
-		texRunUp = IMG_LoadTexture(state.renderer, "assets/player_assets/run_up.png");
-		texRunDown = IMG_LoadTexture(state.renderer, "assets/player_assets/run_down.png");
+		texRunRight = loadTexture(state.renderer, "assets/player_assets/run_right.png");
+		texRunLeft = loadTexture(state.renderer, "assets/player_assets/run_left.png");
+		texRunUp = loadTexture(state.renderer, "assets/player_assets/run_up.png");
+		texRunDown = loadTexture(state.renderer, "assets/player_assets/run_down.png");
+
+		texDirt = loadTexture(state.renderer, "assets/map_assets/tile_003.png");
+		texGrass = loadTexture(state.renderer, "assets/map_assets/tile_040.png");
+		texDirtPillar = loadTexture(state.renderer, "assets/map_assets/tile_059.png");
+
 
 	}
 
@@ -95,10 +106,16 @@ struct Resources {
 
 };
 
+
+//fuctions
 bool initialize(SDLState& state);
 void cleanup(SDLState& state);
+inline glm::vec2 orthoToIso(int col, int row, int tileSize, const SDLState& state);
 void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& deltaTime);
 void update(const SDLState& state, GameState& gs, Resources& res, GameObject& obj, float deltaTime);
+auto createObject(int r, int c, SDL_Texture* tex, ObjectType type, const SDLState& state);
+auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, const SDLState& state,GameState& gs, const Resources& res);
+void createTiles(const SDLState& state, GameState& gs, const Resources& res);
 
 int main(int argc, char* argv[])
 {
@@ -117,28 +134,12 @@ int main(int argc, char* argv[])
 	}
 
 	// game assets
-
 	Resources res;
 	res.load(state);
 
-
 	// game data
 	GameState gs;
-
-	// player data
-	GameObject player;
-	player.type = ObjectType::player;
-	player.data.player = PlayerData();
-	player.texture = res.texIdleDown;
-	player.animations = res.playerAnimations;
-	player.currentAnimation = res.ANIM_PLAYER_IDLE_DOWN;
-	//player.acceleration = glm::vec2(0, 100);
-	player.maxSpeedX = 50;
-	player.maxSpeedY = 50;
-
-
-	gs.layers[LAYER_IDX_CHARACTERS].push_back(player);
-
+	createTiles(state, gs, res);
 
 	// game loop
 	bool runTopLoop = true;
@@ -188,7 +189,6 @@ int main(int argc, char* argv[])
 		previousTime = nowTime;
 	}
 
-	//SDL_DestroyTexture(idleTex);
 	res.unload();
 	cleanup(state);
 	cout << "Shutting Down..." << endl;
@@ -199,12 +199,10 @@ bool initialize(SDLState& state) {
 
 	bool initSuccess = true;
 
-
 	if (!SDL_Init(SDL_INIT_VIDEO)) {
 		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", "SDL3 Initialization Failed.", 0);
 		initSuccess = false;
 	}
-
 
 	//window
 	state.window = SDL_CreateWindow("OS-PROT", state.sc_width, state.sc_height, SDL_WINDOW_RESIZABLE);
@@ -233,11 +231,25 @@ void cleanup(SDLState& state) {
 	SDL_Quit();
 }
 
+inline glm::vec2 orthoToIso(int col, int row, int tileSize ,const SDLState& state) {
+	int tileWidth = tileSize;
+	int tileHeight = tileSize / 2;
+
+	float isoX = (col - row) * (tileWidth / 2.0f);
+	float isoY = (col + row) * (tileHeight / 2.0f);
+
+	float offsetX = state.logW / 2;
+	float offsetY = 0;
+
+	return glm::vec2(isoX + offsetX, isoY + offsetY);
+}
+
+// iso to ortho method ----
 void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& deltaTime) {
 
 
-	const float spriteWidth = 96.0f;
-	const float spriteHeight = 80.0f;
+	const float spriteWidth = obj.sprite_width;
+	const float spriteHeight = obj.sprite_height;
 
 
 
@@ -253,8 +265,8 @@ void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& de
 	SDL_FRect dst{
 		.x = obj.position.x,
 		.y = obj.position.y,
-		.w = spriteWidth * 0.50,
-		.h = spriteHeight * 0.50
+		.w = spriteWidth * obj.scale,
+		.h = spriteHeight * obj.scale
 	};
 
 	SDL_RenderTexture(state.renderer, obj.texture, &src, &dst);
@@ -309,7 +321,7 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 				// deceleration for X movement
 				if (obj.velocity.x != 0) {
 					const float factor = obj.velocity.x > 0 ? accX = 650 : accX = -650;
-					float amount = factor * 500 /*base acceleration value*/ * deltaTime;
+					float amount = factor * accX /*base acceleration value*/ * deltaTime;
 					if (std::abs(obj.velocity.x) < std::abs(amount)) {
 						obj.velocity.x = 0;
 					}
@@ -320,7 +332,7 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 				// deceleration for Y movement
 				if (obj.velocity.y != 0) {
 					const float factor = obj.velocity.y > 0 ? accY = 650 : accY = -650;
-					float amount = factor * 500 /*base acceleration value*/ * deltaTime;
+					float amount = factor * accY /*base acceleration value*/ * deltaTime;
 					if (std::abs(obj.velocity.y) < std::abs(amount)) {
 						obj.velocity.y = 0;
 
@@ -391,9 +403,180 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 			obj.velocity.y = (obj.velocity.y > 0 ? 1 : -1) * obj.maxSpeedY;
 		}
 
-		// add velocity to position
-		obj.position += obj.velocity * deltaTime;
-
 	}
 
+	// add velocity to position
+	obj.position += obj.velocity * deltaTime;
+
 }
+
+auto createObject(int r, int c, SDL_Texture * tex, ObjectType type,const SDLState & state){
+	GameObject o;
+	o.type = type;
+
+	glm::vec2 isoPos = orthoToIso(c, r, TILE_SIZE, state);
+	o.position = isoPos;
+	o.texture = tex;
+
+	return o;
+};
+
+auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, const SDLState &state, GameState &gs, const Resources &res) {
+	switch (map[r][c])
+	{
+	case 1: {
+		GameObject o = createObject(r, c, res.texDirt, ObjectType::level, state);
+		o.sprite_width = TILE_SIZE;
+		o.sprite_height = TILE_SIZE;
+		o.scale = 1.0f;
+		gs.layers[LAYER_IDX_LEVEL].push_back(o);
+		break;
+	}
+	case 2: {
+		GameObject p = createObject(r, c, res.texGrass, ObjectType::level, state);
+		p.sprite_width = TILE_SIZE;
+		p.sprite_height = TILE_SIZE;
+		p.scale = 1.0f;
+		gs.layers[LAYER_IDX_LEVEL].push_back(p);
+		break;
+	}
+	case 3: {
+		GameObject player = createObject(r, c, res.texIdleDown, ObjectType::player, state);
+
+		player.data.player = PlayerData();
+		player.dynamic = true;
+		player.animations = res.playerAnimations;
+		player.currentAnimation = res.ANIM_PLAYER_IDLE_DOWN;
+		player.maxSpeedX = 50;
+		player.maxSpeedY = 50;
+		player.sprite_width = 96.0f;
+		player.sprite_height = 80.0f;
+		player.scale = 0.5f;
+
+		gs.layers[LAYER_IDX_CHARACTERS].push_back(player);
+		break;
+	}
+	case 5: {
+		GameObject o = createObject(r, c, res.texDirtPillar, ObjectType::level, state);
+		o.sprite_width = TILE_SIZE;
+		o.sprite_height = TILE_SIZE;
+		o.scale = 1.0f;
+		o.solid = true;
+		gs.layers[LAYER_IDX_FURNITURE].push_back(o);
+		break;
+	}
+	default: {
+		break;
+
+	}
+	}
+	};
+
+void createTiles(const SDLState& state, GameState& gs, const Resources& res) {
+	/*
+		tile_003 = 1 = dirt
+		tile_040 = 2 = grass
+		 - x -	 = 3 = player
+		 - x -	 = 4 = enemy
+		tile_059 = 5 = dirt pillar
+	*/
+	short terrain_map[MAP_ROWS][MAP_COLS] =
+	{
+	{1,1,1,1,1,2,2,2,2,2,1,1,1,1,1,2,2,2,2,2,1,1,1,1,1},
+	{1,1,1,1,2,2,2,1,1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,1,2},
+	{1,1,1,2,2,2,2,1,1,1,1,1,1,2,2,2,2,1,1,1,1,1,1,2,2},
+	{1,1,2,2,2,2,2,1,1,1,1,2,2,2,2,2,2,1,1,1,1,2,2,2,2},
+	{1,1,1,1,1,2,2,2,2,1,1,1,1,1,2,2,2,2,1,1,1,1,1,2,2},
+	{1,1,1,1,2,2,2,2,2,2,1,1,1,1,2,2,2,2,2,2,1,1,1,2,2},
+	{1,1,1,1,1,2,2,1,2,2,1,1,1,1,1,2,2,1,2,2,1,1,1,1,2},
+	{1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,2},
+	{1,1,1,1,1,2,2,2,1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,2,2},
+	{1,1,1,2,2,2,1,1,1,2,1,1,1,2,2,2,1,1,1,2,1,1,2,2,2},
+	{1,1,1,1,1,2,2,2,2,2,1,1,1,1,1,2,2,2,2,2,1,1,1,1,1},
+	{1,1,1,1,2,2,2,1,1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,1,2},
+	{1,1,1,2,2,2,2,1,1,1,1,1,1,2,2,2,2,1,1,1,1,1,1,2,2},
+	{1,1,2,2,2,2,2,1,1,1,1,2,2,2,2,2,2,1,1,1,1,2,2,2,2},
+	{1,1,1,1,1,2,2,2,2,1,1,1,1,1,2,2,2,2,1,1,1,1,1,2,2},
+	{1,1,1,1,2,2,2,2,2,2,1,1,1,1,2,2,2,2,2,2,1,1,1,2,2},
+	{1,1,1,1,1,2,2,1,2,2,1,1,1,1,1,2,2,1,2,2,1,1,1,1,2},
+	{1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,2},
+	{1,1,1,1,1,2,2,2,1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,2,2},
+	{1,1,1,2,2,2,1,1,1,2,1,1,1,2,2,2,1,1,1,2,1,1,2,2,2},
+	{1,1,1,1,1,2,2,2,2,2,1,1,1,1,1,2,2,2,2,2,1,1,1,1,1},
+	{1,1,1,1,2,2,2,1,1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,1,2},
+	{1,1,1,2,2,2,2,1,1,1,1,1,1,2,2,2,2,1,1,1,1,1,1,2,2},
+	{1,1,2,2,2,2,2,1,1,1,1,2,2,2,2,2,2,1,1,1,1,2,2,2,2},
+	{1,1,1,1,1,2,2,2,2,1,1,1,1,1,2,2,2,2,1,1,1,1,1,2,2}
+	};
+
+
+	short player_map[MAP_ROWS][MAP_COLS] =
+	{
+	{3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+	};
+	short furniture_map[MAP_ROWS][MAP_COLS] =
+	{
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5}
+	};
+
+
+
+
+	for (int r = 0; r < MAP_ROWS; r++) {
+		for (int c = 0; c < MAP_COLS; c++) {
+			//drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, SDLState & state, GameState & gs, Resources & res);
+			drawAll(terrain_map, r, c, state, gs, res);
+			drawAll(player_map, r, c, state, gs, res);
+			drawAll(furniture_map, r, c, state, gs, res);
+
+		}
+	}
+}
+
