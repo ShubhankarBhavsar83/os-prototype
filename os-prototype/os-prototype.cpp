@@ -55,9 +55,9 @@ struct Resources {
 	vector<Animation> playerAnimations;
 
 	vector <SDL_Texture*> textures;
-	SDL_Texture *texRunRight, *texRunLeft, *texRunUp, *texRunDown,
-				*texIdleRight, *texIdleLeft, *texIdleUp, *texIdleDown,
-				*texDirt, *texGrass, *texDirtPillar;
+	SDL_Texture* texRunRight, * texRunLeft, * texRunUp, * texRunDown,
+		* texIdleRight, * texIdleLeft, * texIdleUp, * texIdleDown,
+		* texDirt, * texGrass, * texDirtPillar;
 
 	SDL_Texture* loadTexture(SDL_Renderer* renderer, const string& filepath) {
 
@@ -113,8 +113,10 @@ void cleanup(SDLState& state);
 inline glm::vec2 orthoToIso(int col, int row, int tileSize, const SDLState& state);
 void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& deltaTime);
 void update(const SDLState& state, GameState& gs, Resources& res, GameObject& obj, float deltaTime);
+void collisionResponse(GameObject& objA, SDL_FRect rectC);
+void checkCollision(GameObject& objA, GameObject& objB);
 auto createObject(int r, int c, SDL_Texture* tex, ObjectType type, const SDLState& state);
-auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, const SDLState& state,GameState& gs, const Resources& res);
+auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, const SDLState& state, GameState& gs, const Resources& res);
 void createTiles(const SDLState& state, GameState& gs, const Resources& res);
 
 int main(int argc, char* argv[])
@@ -231,7 +233,7 @@ void cleanup(SDLState& state) {
 	SDL_Quit();
 }
 
-inline glm::vec2 orthoToIso(int col, int row, int tileSize ,const SDLState& state) {
+inline glm::vec2 orthoToIso(int col, int row, int tileSize, const SDLState& state) {
 	int tileWidth = tileSize;
 	int tileHeight = tileSize / 2;
 
@@ -254,6 +256,7 @@ void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& de
 
 
 	float srcX = obj.currentAnimation != -1 ? obj.animations[obj.currentAnimation].currentFrame() * spriteWidth : 0.0f;
+	// srcY - for 2D spite matrix -- todo
 
 
 	SDL_FRect src{
@@ -270,7 +273,13 @@ void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& de
 	};
 
 	SDL_RenderTexture(state.renderer, obj.texture, &src, &dst);
-
+	//SDL_SetRenderDrawColor(state.renderer, 255, 0, 0, 255); // red outline
+	//if (obj.type == ObjectType::player) {
+	//	SDL_RenderRect(state.renderer, &dst);
+	//}
+	//if (obj.solid == true) {
+	//	SDL_RenderRect(state.renderer, &dst);
+	//}
 }
 
 void update(const SDLState& state, GameState& gs, Resources& res, GameObject& obj, float deltaTime) {
@@ -321,7 +330,7 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 				// deceleration for X movement
 				if (obj.velocity.x != 0) {
 					const float factor = obj.velocity.x > 0 ? accX = 650 : accX = -650;
-					float amount = factor * accX /*base acceleration value*/ * deltaTime;
+					float amount = factor * 500 /*base acceleration value*/ * deltaTime;
 					if (std::abs(obj.velocity.x) < std::abs(amount)) {
 						obj.velocity.x = 0;
 					}
@@ -332,7 +341,7 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 				// deceleration for Y movement
 				if (obj.velocity.y != 0) {
 					const float factor = obj.velocity.y > 0 ? accY = 650 : accY = -650;
-					float amount = factor * accY /*base acceleration value*/ * deltaTime;
+					float amount = factor * 500 /*base acceleration value*/ * deltaTime;
 					if (std::abs(obj.velocity.y) < std::abs(amount)) {
 						obj.velocity.y = 0;
 
@@ -387,6 +396,7 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 					obj.texture = res.texRunDown;
 					obj.currentAnimation = res.ANIM_PLAYER_RUN_DOWN;
 				}
+
 			}
 			break;
 		}
@@ -403,14 +413,84 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 			obj.velocity.y = (obj.velocity.y > 0 ? 1 : -1) * obj.maxSpeedY;
 		}
 
+		// add velocity to position
+		obj.position += obj.velocity * deltaTime;
+
 	}
 
-	// add velocity to position
-	obj.position += obj.velocity * deltaTime;
+	 //handle collision 
+	for (auto &layer : gs.layers) {
+		for (GameObject &objB : layer) {
+			if (&obj != &objB) {
+				checkCollision(obj, objB);
+			}
+		}
+	}
+}
+
+void collisionResponse(GameObject& objA,SDL_FRect rectC) {
+	if (rectC.w < rectC.h) {
+
+		if (objA.velocity.x > 0) {
+			objA.position.x -= rectC.w;
+		}
+		else if (objA.velocity.x < 0) {
+			objA.position.x += rectC.w;
+		}
+		objA.velocity.x = 0;
+	}
+	else {
+		if (objA.velocity.y > 0) {
+			objA.position.y -= rectC.h;
+		}
+		else if (objA.velocity.y < 0) {
+			objA.position.y += rectC.h;
+		}
+		objA.velocity.y = 0;
+	}
+}
+
+void checkCollision(GameObject& objA, GameObject& objB) {
+
+	float rectA_width = (objA.sprite_width * objA.scale) - (objA.collider.left + objA.collider.right);
+	float rectA_height = (objA.sprite_height * objA.scale) - (objA.collider.top + objA.collider.bottom);
+
+	float rectB_width = (objB.sprite_width * objB.scale) - (objB.collider.left + objB.collider.right);
+	float rectB_height = (objB.sprite_height * objB.scale) - (objB.collider.top + objB.collider.bottom);
+
+	if (objB.solid == true) {
+		SDL_FRect rectA{
+			.x = objA.position.x + objA.collider.left,
+			.y = objA.position.y + objA.collider.top + (rectB_height / 2),
+			.w = rectA_width,
+			.h = rectA_height - (rectB_height / 2)
+		};
+
+		SDL_FRect rectB{
+			.x = (objB.position.x + objB.collider.left),
+			.y = objB.position.y + objB.collider.top + (rectB_height / 2),
+			.w = rectB_width,
+			.h = rectB_height - (rectB_height / 2)
+		};
+
+		SDL_FRect rectC{ 0 };
+
+
+
+		if (SDL_GetRectIntersectionFloat(&rectA, &rectB, &rectC)) {
+			collisionResponse(objA, rectC);
+		}
+
+	}
+	else {
+		return;
+	}
+
+
 
 }
 
-auto createObject(int r, int c, SDL_Texture * tex, ObjectType type,const SDLState & state){
+auto createObject(int r, int c, SDL_Texture* tex, ObjectType type, const SDLState& state) {
 	GameObject o;
 	o.type = type;
 
@@ -421,7 +501,7 @@ auto createObject(int r, int c, SDL_Texture * tex, ObjectType type,const SDLStat
 	return o;
 };
 
-auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, const SDLState &state, GameState &gs, const Resources &res) {
+auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, const SDLState& state, GameState& gs, const Resources& res) {
 	switch (map[r][c])
 	{
 	case 1: {
@@ -444,14 +524,22 @@ auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, const SDLState &state,
 		GameObject player = createObject(r, c, res.texIdleDown, ObjectType::player, state);
 
 		player.data.player = PlayerData();
-		player.dynamic = true;
+
 		player.animations = res.playerAnimations;
 		player.currentAnimation = res.ANIM_PLAYER_IDLE_DOWN;
+
 		player.maxSpeedX = 50;
 		player.maxSpeedY = 50;
+
 		player.sprite_width = 96.0f;
 		player.sprite_height = 80.0f;
+
 		player.scale = 0.5f;
+
+		player.collider.right = 42.0f * player.scale;
+		player.collider.left = 42.0f * player.scale;
+		player.collider.top = 25.0f * player.scale;
+		player.collider.bottom = 23.0f * player.scale;
 
 		gs.layers[LAYER_IDX_CHARACTERS].push_back(player);
 		break;
@@ -462,6 +550,12 @@ auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, const SDLState &state,
 		o.sprite_height = TILE_SIZE;
 		o.scale = 1.0f;
 		o.solid = true;
+
+		o.collider.right = 7.0f * o.scale;
+		o.collider.left = 6.0f * o.scale;
+		o.collider.top = 3.0f * o.scale;
+		o.collider.bottom = 2.0f * o.scale;
+
 		gs.layers[LAYER_IDX_FURNITURE].push_back(o);
 		break;
 	}
@@ -470,7 +564,7 @@ auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, const SDLState &state,
 
 	}
 	}
-	};
+};
 
 void createTiles(const SDLState& state, GameState& gs, const Resources& res) {
 	/*
@@ -571,11 +665,17 @@ void createTiles(const SDLState& state, GameState& gs, const Resources& res) {
 
 	for (int r = 0; r < MAP_ROWS; r++) {
 		for (int c = 0; c < MAP_COLS; c++) {
-			//drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, SDLState & state, GameState & gs, Resources & res);
-			drawAll(terrain_map, r, c, state, gs, res);
-			drawAll(player_map, r, c, state, gs, res);
-			drawAll(furniture_map, r, c, state, gs, res);
+			if (terrain_map[r][c] != 0) {
+				drawAll(terrain_map, r, c, state, gs, res);
+			}
 
+			if (player_map[r][c] != 0) {
+				drawAll(player_map, r, c, state, gs, res);
+			}
+			
+			if (furniture_map[r][c] != 0) {
+				drawAll(furniture_map, r, c, state, gs, res);
+			}
 		}
 	}
 }

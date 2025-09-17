@@ -16,6 +16,13 @@ struct PlayerData {
 	}
 };
 
+struct Collider {
+	float right;
+	float left;
+	float top;
+	float bottom;
+};
+
 struct LevelData {
 	// todo - implementation pending
 };
@@ -48,8 +55,9 @@ struct GameObject {
 	float sprite_height;
 	float scale;
 
-	bool dynamic;
 	bool solid;
+
+	Collider collider;
 
 	std::vector<Animation> animations;
 	int currentAnimation;
@@ -66,8 +74,14 @@ struct GameObject {
 		sprite_width = 0.0f;
 		sprite_height = 0.0f;
 		scale = 0.0f;
-		dynamic = false;
 		solid = false;
+
+		collider = {
+		.right = 0.0f,
+		.left = 0.0f,
+		.top = 0.0f,
+		.bottom = 0.0f
+		};
 
 		position = velocity = acceleration = glm::vec2(0);
 		currentAnimation = -1;
