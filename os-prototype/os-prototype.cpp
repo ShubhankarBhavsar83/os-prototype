@@ -299,19 +299,19 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 		float VerticalDirection = 0;
 		if (state.keys[SDL_SCANCODE_A]) {
 			mds.X += -1;
-			accX += -500;
+			accX += -700;
 		}
 		if (state.keys[SDL_SCANCODE_D]) {
 			mds.X += 1;
-			accX += 500;
+			accX += 700;
 		}
 		if (state.keys[SDL_SCANCODE_W]) {
 			mds.Y += -1;
-			accY += -500;
+			accY += -700;
 		}
 		if (state.keys[SDL_SCANCODE_S]) {
 			mds.Y += 1;
-			accY += 500;
+			accY += 700;
 		}
 
 
@@ -320,84 +320,84 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 
 		switch (obj.data.player.state) {
 
-		case PlayerState::idle: {
-			if ((mds.X != 0) || (mds.Y != 0)) {
-				obj.data.player.state = PlayerState::running;
-			}
-			else {
-				// deceleration for X movement
-				if (obj.velocity.x != 0) {
-					const float factor = obj.velocity.x > 0 ? accX = 650 : accX = -650;
-					float amount = factor * 500 /*base acceleration value*/ * deltaTime;
-					if (std::abs(obj.velocity.x) < std::abs(amount)) {
-						obj.velocity.x = 0;
+			case PlayerState::idle: {
+				if ((mds.X != 0) || (mds.Y != 0)) {
+					obj.data.player.state = PlayerState::running;
+				}
+				else {
+					// deceleration for X movement
+					if (obj.velocity.x != 0) {
+						const float factor = obj.velocity.x > 0 ? accX = 900 : accX = -900;
+						float amount = factor * 700 /*base acceleration value*/ * deltaTime;
+						if (std::abs(obj.velocity.x) < std::abs(amount)) {
+							obj.velocity.x = 0;
+						}
+						else {
+							obj.velocity.x += amount;
+						}
 					}
-					else {
-						obj.velocity.x += amount;
+					// deceleration for Y movement
+					if (obj.velocity.y != 0) {
+						const float factor = obj.velocity.y > 0 ? accY = 900 : accY = -900;
+						float amount = factor * 700 /*base acceleration value*/ * deltaTime;
+						if (std::abs(obj.velocity.y) < std::abs(amount)) {
+							obj.velocity.y = 0;
+
+						}
+						else {
+
+							obj.velocity.y += amount;
+						}
 					}
 				}
-				// deceleration for Y movement
-				if (obj.velocity.y != 0) {
-					const float factor = obj.velocity.y > 0 ? accY = 650 : accY = -650;
-					float amount = factor * 500 /*base acceleration value*/ * deltaTime;
-					if (std::abs(obj.velocity.y) < std::abs(amount)) {
-						obj.velocity.y = 0;
+				break;
+			}
+			case PlayerState::running: {
+				if ((mds.X == 0) && (mds.Y == 0)) {
+					obj.data.player.state = PlayerState::idle;
 
+					if (obj.directionHorizontal > 0) {
+						obj.texture = res.texIdleRight;
+						obj.currentAnimation = res.ANIM_PLAYER_IDLE_RIGHT;
 					}
-					else {
-
-						obj.velocity.y += amount;
+					else if (obj.directionHorizontal < 0) {
+						obj.texture = res.texIdleLeft;
+						obj.currentAnimation = res.ANIM_PLAYER_IDLE_LEFT;
+					}
+					else if (obj.directionVertical < 0) {
+						obj.texture = res.texIdleUp;
+						obj.currentAnimation = res.ANIM_PLAYER_IDLE_UP;
+					}
+					else if (obj.directionVertical > 0) {
+						obj.texture = res.texIdleDown;
+						obj.currentAnimation = res.ANIM_PLAYER_IDLE_DOWN;
 					}
 				}
+				else if ((mds.X != 0) || (mds.Y != 0)) {
+
+					obj.directionHorizontal = mds.X;
+					obj.directionVertical = mds.Y;
+
+					if (obj.directionHorizontal > 0) {
+						obj.texture = res.texRunRight;
+						obj.currentAnimation = res.ANIM_PLAYER_RUN_RIGHT;
+					}
+					else if (obj.directionHorizontal < 0) {
+						obj.texture = res.texRunLeft;
+						obj.currentAnimation = res.ANIM_PLAYER_RUN_LEFT;
+					}
+					else if (obj.directionVertical < 0) {
+						obj.texture = res.texRunUp;
+						obj.currentAnimation = res.ANIM_PLAYER_RUN_UP;
+					}
+					else if (obj.directionVertical > 0) {
+						obj.texture = res.texRunDown;
+						obj.currentAnimation = res.ANIM_PLAYER_RUN_DOWN;
+					}
+
+				}
+				break;
 			}
-			break;
-		}
-		case PlayerState::running: {
-			if ((mds.X == 0) && (mds.Y == 0)) {
-				obj.data.player.state = PlayerState::idle;
-
-				if (obj.directionHorizontal > 0) {
-					obj.texture = res.texIdleRight;
-					obj.currentAnimation = res.ANIM_PLAYER_IDLE_RIGHT;
-				}
-				else if (obj.directionHorizontal < 0) {
-					obj.texture = res.texIdleLeft;
-					obj.currentAnimation = res.ANIM_PLAYER_IDLE_LEFT;
-				}
-				else if (obj.directionVertical < 0) {
-					obj.texture = res.texIdleUp;
-					obj.currentAnimation = res.ANIM_PLAYER_IDLE_UP;
-				}
-				else if (obj.directionVertical > 0) {
-					obj.texture = res.texIdleDown;
-					obj.currentAnimation = res.ANIM_PLAYER_IDLE_DOWN;
-				}
-			}
-			else if ((mds.X != 0) || (mds.Y != 0)) {
-
-				obj.directionHorizontal = mds.X;
-				obj.directionVertical = mds.Y;
-
-				if (obj.directionHorizontal > 0) {
-					obj.texture = res.texRunRight;
-					obj.currentAnimation = res.ANIM_PLAYER_RUN_RIGHT;
-				}
-				else if (obj.directionHorizontal < 0) {
-					obj.texture = res.texRunLeft;
-					obj.currentAnimation = res.ANIM_PLAYER_RUN_LEFT;
-				}
-				else if (obj.directionVertical < 0) {
-					obj.texture = res.texRunUp;
-					obj.currentAnimation = res.ANIM_PLAYER_RUN_UP;
-				}
-				else if (obj.directionVertical > 0) {
-					obj.texture = res.texRunDown;
-					obj.currentAnimation = res.ANIM_PLAYER_RUN_DOWN;
-				}
-
-			}
-			break;
-		}
 		}
 
 
@@ -414,21 +414,20 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 		// add velocity to position
 		obj.position += obj.velocity * deltaTime;
 		state.playerY = obj.position.y;
+		state.playerX = obj.position.x;
+
 
 	}
 
+	float playerXrangeStart = state.playerX - (state.logW * 0.15f);
+	float playerXrangeEnd = state.playerX + (state.logW * 0.15f);
+
+	float playerYrangeStart = state.playerY - (state.logH * 0.15f);
+	float playerYrangeEnd = state.playerY + (state.logH * 0.15f);
 
 
-
-	//layering of objects relatve to player
-	for (size_t layerIdx = 0; layerIdx < gs.layers.size(); ++layerIdx) {
-		auto& layer = gs.layers[layerIdx];
-
-		std::vector<size_t> toRemove;
-
-		for (size_t i = 0; i < layer.size(); ++i) {
-			GameObject& obj = layer[i];
-
+	if (obj.position.x > playerXrangeStart && obj.position.x < playerXrangeEnd) {
+		if (obj.position.y > playerYrangeStart && obj.position.y < playerYrangeEnd) {
 			if (obj.type == ObjectType::furniture && obj.id >= 300 && obj.id < 400) {
 				size_t newLayerIdx;
 
@@ -439,26 +438,37 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 					newLayerIdx = LAYER_IDX_FURNITURE_BACKGROUND;
 				}
 
-				if (newLayerIdx != layerIdx) {
-					gs.layers[newLayerIdx].push_back(std::move(obj));
-					toRemove.push_back(i);
+				if (obj.currentLayer != newLayerIdx) {
+					auto& oldLayer = gs.layers[obj.currentLayer];
+
+					auto it = std::find_if(oldLayer.begin(), oldLayer.end(),
+						[&](const GameObject& o) { return &o == &obj; });
+
+					if (it != oldLayer.end()) {
+
+						gs.layers[newLayerIdx].push_back(std::move(*it));
+						gs.layers[newLayerIdx].back().currentLayer = newLayerIdx;
+						oldLayer.erase(it);
+
+					}
 				}
 			}
 		}
-
-		for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
-			layer.erase(layer.begin() + *it);
-		}
 	}
-
-
-
 
 	 //handle collision 
 	for (auto &layer : gs.layers) {
 		for (GameObject &objB : layer) {
 			if (&obj != &objB) {
-				checkCollision(obj, objB);
+				float objB_left = objB.position.x + objB.collider.left;
+				float objB_right = objB.position.x + objB.sprite_width * objB.scale - objB.collider.right;
+				float objB_top = objB.position.y + objB.collider.top;
+				float objB_bottom = objB.position.y + objB.sprite_height * objB.scale - objB.collider.bottom;
+
+				if (objB_right > playerXrangeStart && objB_left < playerXrangeEnd &&
+					objB_bottom > playerYrangeStart && objB_top < playerYrangeEnd) {
+					checkCollision(obj, objB);
+				}
 			}
 		}
 	}
@@ -604,6 +614,7 @@ auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, SDLState& state, GameS
 		o.collider.top = 3.0f * o.scale;
 		o.collider.bottom = 2.0f * o.scale;
 
+		o.currentLayer = LAYER_IDX_FURNITURE_BACKGROUND;
 		gs.layers[LAYER_IDX_FURNITURE_BACKGROUND].push_back(o);
 		break;
 	}

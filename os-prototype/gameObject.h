@@ -50,6 +50,7 @@ struct GameObject {
 	ObjectData data;
 
 	int id;
+	size_t currentLayer;
 
 
 	glm::vec2 position, velocity, acceleration;
@@ -75,6 +76,7 @@ struct GameObject {
 		type = ObjectType::level;
 
 		id = 1;
+		currentLayer = 0;
 
 		directionVertical = -1;
 		directionHorizontal = 1;
