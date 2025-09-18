@@ -29,20 +29,27 @@ struct LevelData {
 struct EnemyData {
 	// todo - implementation pending
 };
+struct FurnitureData {
+
+};
 union ObjectData {
 	PlayerData player; 
 	LevelData level;
 	EnemyData enemy;
+	FurnitureData furniture;
+
 };
 
 enum class ObjectType
 {
-	player, level, enemy
+	player, level, enemy, furniture
 };
 
 struct GameObject {
 	ObjectType type;
 	ObjectData data;
+
+	int id;
 
 
 	glm::vec2 position, velocity, acceleration;
@@ -66,6 +73,8 @@ struct GameObject {
 
 	GameObject() : data{ .level = LevelData() } {
 		type = ObjectType::level;
+
+		id = 1;
 
 		directionVertical = -1;
 		directionHorizontal = 1;

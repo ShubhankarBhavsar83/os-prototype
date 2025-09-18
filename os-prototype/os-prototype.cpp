@@ -18,6 +18,8 @@ struct SDLState {
 	SDL_Window* window;
 	SDL_Renderer* renderer;
 	int sc_width, sc_height, logW, logH;
+	float playerY;
+	float playerX;
 	const bool* keys;
 	SDLState() : keys(SDL_GetKeyboardState(nullptr)) {
 
@@ -26,14 +28,16 @@ struct SDLState {
 };
 
 const size_t LAYER_IDX_LEVEL = 0;
-const size_t LAYER_IDX_FURNITURE = 1;
+const size_t LAYER_IDX_FURNITURE_BACKGROUND = 1;
 const size_t LAYER_IDX_CHARACTERS = 2;
+const size_t LAYER_IDX_FURNITURE_FOREGROUND = 3;
+
 const int MAP_ROWS = 25;
 const int MAP_COLS = 25;
 const int TILE_SIZE = 32;
 
 struct GameState {
-	array<vector<GameObject>, 3> layers;
+	array<vector<GameObject>, 4> layers;
 	int playerIndex;
 
 	GameState() {
@@ -112,12 +116,12 @@ bool initialize(SDLState& state);
 void cleanup(SDLState& state);
 inline glm::vec2 orthoToIso(int col, int row, int tileSize, const SDLState& state);
 void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& deltaTime);
-void update(const SDLState& state, GameState& gs, Resources& res, GameObject& obj, float deltaTime);
+void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, float deltaTime);
 void collisionResponse(GameObject& objA, SDL_FRect rectC);
 void checkCollision(GameObject& objA, GameObject& objB);
 auto createObject(int r, int c, SDL_Texture* tex, ObjectType type, const SDLState& state);
-auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, const SDLState& state, GameState& gs, const Resources& res);
-void createTiles(const SDLState& state, GameState& gs, const Resources& res);
+auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c,SDLState& state, GameState& gs, const Resources& res);
+void createTiles(SDLState& state, GameState& gs, const Resources& res);
 
 int main(int argc, char* argv[])
 {
@@ -162,6 +166,7 @@ int main(int argc, char* argv[])
 				state.sc_height = event.window.data2;
 			}
 		}
+
 
 		// update game objects
 		for (auto& layer : gs.layers) {
@@ -273,16 +278,9 @@ void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& de
 	};
 
 	SDL_RenderTexture(state.renderer, obj.texture, &src, &dst);
-	//SDL_SetRenderDrawColor(state.renderer, 255, 0, 0, 255); // red outline
-	//if (obj.type == ObjectType::player) {
-	//	SDL_RenderRect(state.renderer, &dst);
-	//}
-	//if (obj.solid == true) {
-	//	SDL_RenderRect(state.renderer, &dst);
-	//}
 }
 
-void update(const SDLState& state, GameState& gs, Resources& res, GameObject& obj, float deltaTime) {
+void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, float deltaTime) {
 
 	if (obj.type == ObjectType::player) {
 
@@ -375,7 +373,7 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 					obj.currentAnimation = res.ANIM_PLAYER_IDLE_DOWN;
 				}
 			}
-			else {
+			else if ((mds.X != 0) || (mds.Y != 0)) {
 
 				obj.directionHorizontal = mds.X;
 				obj.directionVertical = mds.Y;
@@ -415,8 +413,46 @@ void update(const SDLState& state, GameState& gs, Resources& res, GameObject& ob
 
 		// add velocity to position
 		obj.position += obj.velocity * deltaTime;
+		state.playerY = obj.position.y;
 
 	}
+
+
+
+
+	//layering of objects relatve to player
+	for (size_t layerIdx = 0; layerIdx < gs.layers.size(); ++layerIdx) {
+		auto& layer = gs.layers[layerIdx];
+
+		std::vector<size_t> toRemove;
+
+		for (size_t i = 0; i < layer.size(); ++i) {
+			GameObject& obj = layer[i];
+
+			if (obj.type == ObjectType::furniture && obj.id >= 300 && obj.id < 400) {
+				size_t newLayerIdx;
+
+				if (obj.position.y > state.playerY) {
+					newLayerIdx = LAYER_IDX_FURNITURE_FOREGROUND;
+				}
+				else {
+					newLayerIdx = LAYER_IDX_FURNITURE_BACKGROUND;
+				}
+
+				if (newLayerIdx != layerIdx) {
+					gs.layers[newLayerIdx].push_back(std::move(obj));
+					toRemove.push_back(i);
+				}
+			}
+		}
+
+		for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+			layer.erase(layer.begin() + *it);
+		}
+	}
+
+
+
 
 	 //handle collision 
 	for (auto &layer : gs.layers) {
@@ -501,11 +537,15 @@ auto createObject(int r, int c, SDL_Texture* tex, ObjectType type, const SDLStat
 	return o;
 };
 
-auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, const SDLState& state, GameState& gs, const Resources& res) {
+auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, SDLState& state, GameState& gs, const Resources& res) {
+
+
 	switch (map[r][c])
 	{
 	case 1: {
 		GameObject o = createObject(r, c, res.texDirt, ObjectType::level, state);
+		o.id = 200;
+
 		o.sprite_width = TILE_SIZE;
 		o.sprite_height = TILE_SIZE;
 		o.scale = 1.0f;
@@ -513,17 +553,23 @@ auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, const SDLState& state,
 		break;
 	}
 	case 2: {
-		GameObject p = createObject(r, c, res.texGrass, ObjectType::level, state);
-		p.sprite_width = TILE_SIZE;
-		p.sprite_height = TILE_SIZE;
-		p.scale = 1.0f;
-		gs.layers[LAYER_IDX_LEVEL].push_back(p);
+		GameObject o = createObject(r, c, res.texGrass, ObjectType::level, state);
+		o.id = 201;
+
+		o.sprite_width = TILE_SIZE;
+		o.sprite_height = TILE_SIZE;
+		o.scale = 1.0f;
+		gs.layers[LAYER_IDX_LEVEL].push_back(o);
 		break;
 	}
 	case 3: {
 		GameObject player = createObject(r, c, res.texIdleDown, ObjectType::player, state);
-
 		player.data.player = PlayerData();
+
+		player.id = 100;
+
+		state.playerY = player.position.y;
+		state.playerX = player.position.x;
 
 		player.animations = res.playerAnimations;
 		player.currentAnimation = res.ANIM_PLAYER_IDLE_DOWN;
@@ -545,7 +591,9 @@ auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, const SDLState& state,
 		break;
 	}
 	case 5: {
-		GameObject o = createObject(r, c, res.texDirtPillar, ObjectType::level, state);
+		GameObject o = createObject(r, c, res.texDirtPillar, ObjectType::furniture, state);
+		o.id = 301;
+
 		o.sprite_width = TILE_SIZE;
 		o.sprite_height = TILE_SIZE;
 		o.scale = 1.0f;
@@ -556,7 +604,7 @@ auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, const SDLState& state,
 		o.collider.top = 3.0f * o.scale;
 		o.collider.bottom = 2.0f * o.scale;
 
-		gs.layers[LAYER_IDX_FURNITURE].push_back(o);
+		gs.layers[LAYER_IDX_FURNITURE_BACKGROUND].push_back(o);
 		break;
 	}
 	default: {
@@ -566,7 +614,7 @@ auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, const SDLState& state,
 	}
 };
 
-void createTiles(const SDLState& state, GameState& gs, const Resources& res) {
+void createTiles(SDLState& state, GameState& gs, const Resources& res) {
 	/*
 		tile_003 = 1 = dirt
 		tile_040 = 2 = grass
