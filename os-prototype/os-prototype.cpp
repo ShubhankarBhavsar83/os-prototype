@@ -8,6 +8,7 @@
 #include <vector>
 #include <string>
 #include <array>
+#include <format>
 
 #include "gameObject.h"
 
@@ -20,6 +21,7 @@ struct SDLState {
 	int sc_width, sc_height, logW, logH;
 	float playerY;
 	float playerX;
+	short horizontalDirection, VerticalDirection;
 	const bool* keys;
 	SDLState() : keys(SDL_GetKeyboardState(nullptr)) {
 
@@ -41,26 +43,21 @@ struct GameState {
 	int playerIndex;
 
 	GameState() {
-		playerIndex = 0; // todo - update when loading maps
+		playerIndex = -1; // todo - update when loading maps
+	}
+	GameObject& player() {
+		return layers[LAYER_IDX_CHARACTERS][playerIndex];
 	}
 };
 
 struct Resources {
-	const int ANIM_PLAYER_IDLE_RIGHT = 0;
-	const int ANIM_PLAYER_IDLE_LEFT = 1;
-	const int ANIM_PLAYER_IDLE_UP = 2;
-	const int ANIM_PLAYER_IDLE_DOWN = 3;
-
-	const int ANIM_PLAYER_RUN_RIGHT = 4;
-	const int ANIM_PLAYER_RUN_LEFT = 5;
-	const int ANIM_PLAYER_RUN_UP = 6;
-	const int ANIM_PLAYER_RUN_DOWN = 7;
+	const int ANIM_EIGHT_RUNNER = 0;
+	const int ANIM_EIGHT_IDLE = 1;
 
 	vector<Animation> playerAnimations;
 
 	vector <SDL_Texture*> textures;
-	SDL_Texture* texRunRight, * texRunLeft, * texRunUp, * texRunDown,
-		* texIdleRight, * texIdleLeft, * texIdleUp, * texIdleDown,
+	SDL_Texture* texPlayerRun, *texPlayerIdle,
 		* texDirt, * texGrass, * texDirtPillar;
 
 	SDL_Texture* loadTexture(SDL_Renderer* renderer, const string& filepath) {
@@ -72,27 +69,14 @@ struct Resources {
 	}
 
 	void load(SDLState& state) {
-		playerAnimations.resize(8);
-		playerAnimations[ANIM_PLAYER_IDLE_RIGHT] = Animation(8, 0.7);
-		playerAnimations[ANIM_PLAYER_IDLE_LEFT] = Animation(8, 0.7);
-		playerAnimations[ANIM_PLAYER_IDLE_UP] = Animation(8, 0.7);
-		playerAnimations[ANIM_PLAYER_IDLE_DOWN] = Animation(8, 0.7);
+		playerAnimations.resize(20);
 
-		playerAnimations[ANIM_PLAYER_RUN_RIGHT] = Animation(8, 0.7);
-		playerAnimations[ANIM_PLAYER_RUN_LEFT] = Animation(8, 0.7);
-		playerAnimations[ANIM_PLAYER_RUN_UP] = Animation(8, 0.7);
-		playerAnimations[ANIM_PLAYER_RUN_DOWN] = Animation(8, 0.7);
+		playerAnimations[ANIM_EIGHT_RUNNER] = Animation(15, 0.7);
+		playerAnimations[ANIM_EIGHT_IDLE] = Animation(15, 0.9);
 
+		texPlayerRun = loadTexture(state.renderer, "assets/player_assets/Run.png");
+		texPlayerIdle = loadTexture(state.renderer, "assets/player_assets/Idle.png");
 
-		texIdleRight = loadTexture(state.renderer, "assets/player_assets/idle_right.png");
-		texIdleLeft = loadTexture(state.renderer, "assets/player_assets/idle_left.png");
-		texIdleUp = loadTexture(state.renderer, "assets/player_assets/idle_up.png");
-		texIdleDown = loadTexture(state.renderer, "assets/player_assets/idle_down.png");
-
-		texRunRight = loadTexture(state.renderer, "assets/player_assets/run_right.png");
-		texRunLeft = loadTexture(state.renderer, "assets/player_assets/run_left.png");
-		texRunUp = loadTexture(state.renderer, "assets/player_assets/run_up.png");
-		texRunDown = loadTexture(state.renderer, "assets/player_assets/run_down.png");
 
 		texDirt = loadTexture(state.renderer, "assets/map_assets/tile_003.png");
 		texGrass = loadTexture(state.renderer, "assets/map_assets/tile_040.png");
@@ -122,6 +106,7 @@ void checkCollision(GameObject& objA, GameObject& objB);
 auto createObject(int r, int c, SDL_Texture* tex, ObjectType type, const SDLState& state);
 auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c,SDLState& state, GameState& gs, const Resources& res);
 void createTiles(SDLState& state, GameState& gs, const Resources& res);
+void handleKeyInput(const SDLState& state, GameState& gs, GameObject& obj, SDL_Scancode key, bool keyDown);
 
 int main(int argc, char* argv[])
 {
@@ -156,15 +141,24 @@ int main(int argc, char* argv[])
 		SDL_Event event{ 0 };
 		while (SDL_PollEvent(&event)) {
 			switch (event.type) {
-			case SDL_EVENT_QUIT: {
-				runTopLoop = false;
-				break;
+				case SDL_EVENT_QUIT: {
+					runTopLoop = false;
+					break;
+				}
+				case SDL_EVENT_WINDOW_RESIZED: {
+					state.sc_width = event.window.data1;
+					state.sc_height = event.window.data2;
+				}
+				case SDL_EVENT_KEY_UP: {
+					handleKeyInput(state, gs, gs.player(), event.key.scancode, true);
+					break;
+				}
+				case SDL_EVENT_KEY_DOWN: {
+					handleKeyInput(state, gs, gs.player(), event.key.scancode, true);
+					break;
+				}
 			}
-
-			case SDL_EVENT_WINDOW_RESIZED:
-				state.sc_width = event.window.data1;
-				state.sc_height = event.window.data2;
-			}
+			
 		}
 
 
@@ -251,8 +245,8 @@ inline glm::vec2 orthoToIso(int col, int row, int tileSize, const SDLState& stat
 	return glm::vec2(isoX + offsetX, isoY + offsetY);
 }
 
-// iso to ortho method ----
-void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& deltaTime) {
+	// iso to ortho method ----
+	void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& deltaTime) {
 
 
 	const float spriteWidth = obj.sprite_width;
@@ -262,11 +256,18 @@ void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& de
 
 	float srcX = obj.currentAnimation != -1 ? obj.animations[obj.currentAnimation].currentFrame() * spriteWidth : 0.0f;
 	// srcY - for 2D spite matrix -- todo
-
+	float srcY = 0.0f;
+	if (obj.type == ObjectType::player) {
+		if (obj.verticalSpriteIndex != 0) {
+			srcY = ((obj.verticalSpriteIndex) * obj.sprite_height);
+		}
+	}
+	SDL_SetRenderDrawColor(state.renderer, 0, 0, 0, 255);
+	SDL_RenderDebugText(state.renderer, 5, 5, std::format("srcY: {}", srcY).c_str());
 
 	SDL_FRect src{
 		.x = srcX,
-		.y = 0,
+		.y = srcY,
 		.w = spriteWidth,
 		.h = spriteHeight
 	};
@@ -277,6 +278,7 @@ void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& de
 		.h = spriteHeight * obj.scale
 	};
 
+
 	SDL_RenderTexture(state.renderer, obj.texture, &src, &dst);
 }
 
@@ -286,6 +288,8 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 
 		float accX = 0.0;
 		float accY = 0.0;
+		short base_accel = 700;
+		short base_decel = 900;
 
 		struct MoveDirectionSet {
 			float X = 0.0;
@@ -299,24 +303,22 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 		float VerticalDirection = 0;
 		if (state.keys[SDL_SCANCODE_A]) {
 			mds.X += -1;
-			accX += -700;
+			accX += -base_accel;
 		}
 		if (state.keys[SDL_SCANCODE_D]) {
 			mds.X += 1;
-			accX += 700;
+			accX += base_accel;
 		}
 		if (state.keys[SDL_SCANCODE_W]) {
 			mds.Y += -1;
-			accY += -700;
+			accY += -base_accel;
 		}
 		if (state.keys[SDL_SCANCODE_S]) {
 			mds.Y += 1;
-			accY += 700;
+			accY += base_accel;
 		}
 
-
 		obj.acceleration = glm::vec2(accX, accY);
-
 
 		switch (obj.data.player.state) {
 
@@ -327,8 +329,8 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 				else {
 					// deceleration for X movement
 					if (obj.velocity.x != 0) {
-						const float factor = obj.velocity.x > 0 ? accX = 900 : accX = -900;
-						float amount = factor * 700 /*base acceleration value*/ * deltaTime;
+						const float factor = obj.velocity.x > 0 ? accX = base_decel : accX = -base_decel;
+						float amount = factor * base_accel /*base acceleration value*/ * deltaTime;
 						if (std::abs(obj.velocity.x) < std::abs(amount)) {
 							obj.velocity.x = 0;
 						}
@@ -338,8 +340,8 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 					}
 					// deceleration for Y movement
 					if (obj.velocity.y != 0) {
-						const float factor = obj.velocity.y > 0 ? accY = 900 : accY = -900;
-						float amount = factor * 700 /*base acceleration value*/ * deltaTime;
+						const float factor = obj.velocity.y > 0 ? accY = base_decel : accY = -base_decel;
+						float amount = factor * base_accel /*base acceleration value*/ * deltaTime;
 						if (std::abs(obj.velocity.y) < std::abs(amount)) {
 							obj.velocity.y = 0;
 
@@ -355,46 +357,137 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 			case PlayerState::running: {
 				if ((mds.X == 0) && (mds.Y == 0)) {
 					obj.data.player.state = PlayerState::idle;
+					obj.texture = res.texPlayerIdle;
 
-					if (obj.directionHorizontal > 0) {
-						obj.texture = res.texIdleRight;
-						obj.currentAnimation = res.ANIM_PLAYER_IDLE_RIGHT;
+					obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+
+					if (obj.directionHorizontal > 0 && (int)obj.directionVertical == 0) {
+						obj.verticalSpriteIndex = 0;
+						obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+
+
 					}
-					else if (obj.directionHorizontal < 0) {
-						obj.texture = res.texIdleLeft;
-						obj.currentAnimation = res.ANIM_PLAYER_IDLE_LEFT;
+					else if (obj.directionHorizontal > 0 && obj.directionVertical > 0) {
+						obj.verticalSpriteIndex = 1;
+						obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+
+
 					}
-					else if (obj.directionVertical < 0) {
-						obj.texture = res.texIdleUp;
-						obj.currentAnimation = res.ANIM_PLAYER_IDLE_UP;
+					else if ((int)obj.directionHorizontal == 0 && obj.directionVertical > 0) {
+						obj.verticalSpriteIndex = 2;
+						obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+
+
 					}
-					else if (obj.directionVertical > 0) {
-						obj.texture = res.texIdleDown;
-						obj.currentAnimation = res.ANIM_PLAYER_IDLE_DOWN;
+					else if (obj.directionHorizontal < 0 && obj.directionVertical > 0) {
+						obj.verticalSpriteIndex = 3;
+						obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+
+
+					}
+					else if (obj.directionHorizontal < 0 && (int)obj.directionVertical == 0) {
+						obj.verticalSpriteIndex = 4;
+						obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+
+					}
+					else if (obj.directionHorizontal < 0 && obj.directionVertical < 0) {
+						obj.verticalSpriteIndex = 5;
+						obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+
+					}
+					else if ((int)obj.directionHorizontal == 0 && obj.directionVertical < 0) {
+						obj.verticalSpriteIndex = 6;
+						obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+
+					}
+					else if (obj.directionHorizontal > 0 && obj.directionVertical < 0) {
+						obj.verticalSpriteIndex = 7;
+						obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+
+
 					}
 				}
 				else if ((mds.X != 0) || (mds.Y != 0)) {
+						obj.texture = res.texPlayerRun;
+
+					if (mds.X == 0) {
+						// deceleration for X movement
+						if (obj.velocity.x != 0) {
+							const float factor = obj.velocity.x > 0 ? accX = base_decel : accX = -base_decel;
+							float amount = factor * base_accel /*base acceleration value*/ * deltaTime;
+							if (std::abs(obj.velocity.x) < std::abs(amount)) {
+								obj.velocity.x = 0;
+							}
+							else {
+								obj.velocity.x += amount;
+							}
+						}
+					}
+					if(mds.Y == 0) {
+						// deceleration for Y movement
+						if (obj.velocity.y != 0) {
+							const float factor = obj.velocity.y > 0 ? accY = base_decel : accY = -base_decel;
+							float amount = factor * base_accel /*base acceleration value*/ * deltaTime;
+							if (std::abs(obj.velocity.y) < std::abs(amount)) {
+								obj.velocity.y = 0;
+
+							}
+							else {
+
+								obj.velocity.y += amount;
+							}
+						}
+					}
 
 					obj.directionHorizontal = mds.X;
 					obj.directionVertical = mds.Y;
 
-					if (obj.directionHorizontal > 0) {
-						obj.texture = res.texRunRight;
-						obj.currentAnimation = res.ANIM_PLAYER_RUN_RIGHT;
-					}
-					else if (obj.directionHorizontal < 0) {
-						obj.texture = res.texRunLeft;
-						obj.currentAnimation = res.ANIM_PLAYER_RUN_LEFT;
-					}
-					else if (obj.directionVertical < 0) {
-						obj.texture = res.texRunUp;
-						obj.currentAnimation = res.ANIM_PLAYER_RUN_UP;
-					}
-					else if (obj.directionVertical > 0) {
-						obj.texture = res.texRunDown;
-						obj.currentAnimation = res.ANIM_PLAYER_RUN_DOWN;
-					}
 
+					if (obj.directionHorizontal > 0 && (int)obj.directionVertical == 0) {
+						obj.verticalSpriteIndex = 0;
+						obj.currentAnimation = res.ANIM_EIGHT_RUNNER;
+
+
+					} 
+					else if (obj.directionHorizontal > 0 && obj.directionVertical > 0) {
+						obj.verticalSpriteIndex = 1;
+						obj.currentAnimation = res.ANIM_EIGHT_RUNNER;
+
+
+					}
+					else if ((int)obj.directionHorizontal == 0 && obj.directionVertical > 0) {
+						obj.verticalSpriteIndex = 2;
+						obj.currentAnimation = res.ANIM_EIGHT_RUNNER;
+
+
+					}
+					else if (obj.directionHorizontal < 0 && obj.directionVertical > 0) {
+						obj.verticalSpriteIndex = 3;
+						obj.currentAnimation = res.ANIM_EIGHT_RUNNER;
+
+
+					}
+					else if (obj.directionHorizontal < 0 && (int)obj.directionVertical == 0) {
+						obj.verticalSpriteIndex = 4;
+						obj.currentAnimation = res.ANIM_EIGHT_RUNNER;
+
+					}
+					else if (obj.directionHorizontal < 0 && obj.directionVertical < 0) {
+						obj.verticalSpriteIndex = 5;
+						obj.currentAnimation = res.ANIM_EIGHT_RUNNER;
+
+					}
+					else if ((int)obj.directionHorizontal == 0 && obj.directionVertical < 0) {
+						obj.verticalSpriteIndex = 6;
+						obj.currentAnimation = res.ANIM_EIGHT_RUNNER;
+
+					}
+					else if (obj.directionHorizontal > 0 && obj.directionVertical < 0) {
+ 						obj.verticalSpriteIndex = 7;
+						obj.currentAnimation = res.ANIM_EIGHT_RUNNER;
+
+
+					}
 				}
 				break;
 			}
@@ -419,11 +512,11 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 
 	}
 
-	float playerXrangeStart = state.playerX - (state.logW * 0.15f);
-	float playerXrangeEnd = state.playerX + (state.logW * 0.15f);
+	float playerXrangeStart = state.playerX - (state.logW * 0.50f);
+	float playerXrangeEnd = state.playerX + (state.logW * 0.50f);
 
-	float playerYrangeStart = state.playerY - (state.logH * 0.15f);
-	float playerYrangeEnd = state.playerY + (state.logH * 0.15f);
+	float playerYrangeStart = state.playerY - (state.logH * 0.50f);
+	float playerYrangeEnd = state.playerY + (state.logH * 0.50f);
 
 
 	if (obj.position.x > playerXrangeStart && obj.position.x < playerXrangeEnd) {
@@ -552,76 +645,79 @@ auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, SDLState& state, GameS
 
 	switch (map[r][c])
 	{
-	case 1: {
-		GameObject o = createObject(r, c, res.texDirt, ObjectType::level, state);
-		o.id = 200;
+		case 1: {
+			GameObject o = createObject(r, c, res.texDirt, ObjectType::level, state);
+			o.id = 200;
 
-		o.sprite_width = TILE_SIZE;
-		o.sprite_height = TILE_SIZE;
-		o.scale = 1.0f;
-		gs.layers[LAYER_IDX_LEVEL].push_back(o);
-		break;
-	}
-	case 2: {
-		GameObject o = createObject(r, c, res.texGrass, ObjectType::level, state);
-		o.id = 201;
+			o.sprite_width = TILE_SIZE;
+			o.sprite_height = TILE_SIZE;
+			o.scale = 1.0f;
+			gs.layers[LAYER_IDX_LEVEL].push_back(o);
+			break;
+		}
+		case 2: {
+			GameObject o = createObject(r, c, res.texGrass, ObjectType::level, state);
+			o.id = 201;
 
-		o.sprite_width = TILE_SIZE;
-		o.sprite_height = TILE_SIZE;
-		o.scale = 1.0f;
-		gs.layers[LAYER_IDX_LEVEL].push_back(o);
-		break;
-	}
-	case 3: {
-		GameObject player = createObject(r, c, res.texIdleDown, ObjectType::player, state);
-		player.data.player = PlayerData();
+			o.sprite_width = TILE_SIZE;
+			o.sprite_height = TILE_SIZE;
+			o.scale = 1.0f;
+			gs.layers[LAYER_IDX_LEVEL].push_back(o);
+			break;
+		}
+		case 3: {
+			GameObject player = createObject(r, c, res.texPlayerIdle, ObjectType::player, state);
+			player.data.player = PlayerData();
 
-		player.id = 100;
+			player.id = 100;
 
-		state.playerY = player.position.y;
-		state.playerX = player.position.x;
+			state.playerY = player.position.y;
+			state.playerX = player.position.x;
 
-		player.animations = res.playerAnimations;
-		player.currentAnimation = res.ANIM_PLAYER_IDLE_DOWN;
+			player.animations = res.playerAnimations;
+			player.currentAnimation = res.ANIM_EIGHT_IDLE;
+			player.verticalSpriteIndex = 0;
 
-		player.maxSpeedX = 50;
-		player.maxSpeedY = 50;
 
-		player.sprite_width = 96.0f;
-		player.sprite_height = 80.0f;
+			player.maxSpeedX = 50;
+			player.maxSpeedY = 50;
 
-		player.scale = 0.5f;
+			player.sprite_width = 128.0f;
+			player.sprite_height = 128.0f;
 
-		player.collider.right = 42.0f * player.scale;
-		player.collider.left = 42.0f * player.scale;
-		player.collider.top = 25.0f * player.scale;
-		player.collider.bottom = 23.0f * player.scale;
+			player.scale = 0.3f;
 
-		gs.layers[LAYER_IDX_CHARACTERS].push_back(player);
-		break;
-	}
-	case 5: {
-		GameObject o = createObject(r, c, res.texDirtPillar, ObjectType::furniture, state);
-		o.id = 301;
+			player.collider.right = 45.0f * player.scale;
+			player.collider.left = 49.0f * player.scale;
+			player.collider.top = 48.0f * player.scale;
+			player.collider.bottom = 30.0f * player.scale;
 
-		o.sprite_width = TILE_SIZE;
-		o.sprite_height = TILE_SIZE;
-		o.scale = 1.0f;
-		o.solid = true;
+			gs.layers[LAYER_IDX_CHARACTERS].push_back(player);
+			gs.playerIndex = gs.layers[LAYER_IDX_CHARACTERS].size() - 1;
+			break;
+		}
+		case 5: {
+			GameObject o = createObject(r, c, res.texDirtPillar, ObjectType::furniture, state);
+			o.id = 301;
 
-		o.collider.right = 7.0f * o.scale;
-		o.collider.left = 6.0f * o.scale;
-		o.collider.top = 3.0f * o.scale;
-		o.collider.bottom = 2.0f * o.scale;
+			o.sprite_width = TILE_SIZE;
+			o.sprite_height = TILE_SIZE;
+			o.scale = 1.0f;
+			o.solid = true;
 
-		o.currentLayer = LAYER_IDX_FURNITURE_BACKGROUND;
-		gs.layers[LAYER_IDX_FURNITURE_BACKGROUND].push_back(o);
-		break;
-	}
-	default: {
-		break;
+			o.collider.right = 7.0f * o.scale;
+			o.collider.left = 6.0f * o.scale;
+			o.collider.top = 3.0f * o.scale;
+			o.collider.bottom = 2.0f * o.scale;
 
-	}
+			o.currentLayer = LAYER_IDX_FURNITURE_BACKGROUND;
+			gs.layers[LAYER_IDX_FURNITURE_BACKGROUND].push_back(o);
+			break;
+		}
+		default: {
+			break;
+
+		}
 	}
 };
 
@@ -737,5 +833,10 @@ void createTiles(SDLState& state, GameState& gs, const Resources& res) {
 			}
 		}
 	}
+	assert(gs.playerIndex != -1);
 }
 
+void handleKeyInput(const SDLState& state, GameState& gs, GameObject& obj, SDL_Scancode key, bool keyDown) {
+	const float DASH_FORCE = 200.0f;
+
+}

@@ -52,7 +52,6 @@ struct GameObject {
 	int id;
 	size_t currentLayer;
 
-
 	glm::vec2 position, velocity, acceleration;
 
 	float directionVertical;   // -1 = up , 1 = down
@@ -62,6 +61,7 @@ struct GameObject {
 	float sprite_width;
 	float sprite_height;
 	float scale;
+	short verticalSpriteIndex; // up - 0, top right - 1, right - 2, bottom right - 3 , down - 4, bottom left - 5 , left - 6 , top left - 7
 
 	bool solid;
 
@@ -86,6 +86,7 @@ struct GameObject {
 		sprite_height = 0.0f;
 		scale = 0.0f;
 		solid = false;
+		verticalSpriteIndex = 0;
 
 		collider = {
 		.right = 0.0f,
