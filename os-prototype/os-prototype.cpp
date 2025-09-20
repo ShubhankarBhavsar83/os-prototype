@@ -41,9 +41,16 @@ const int TILE_SIZE = 32;
 struct GameState {
 	array<vector<GameObject>, 4> layers;
 	int playerIndex;
+	SDL_FRect mapViewport;
 
-	GameState() {
-		playerIndex = -1; // todo - update when loading maps
+	GameState(const SDLState &state) {
+		playerIndex = -1;
+		mapViewport = {
+			.x = 0,
+			.y = 0,
+			.w = static_cast<float>(state.logW),
+			.h = static_cast<float>(state.logH)
+		};
 	}
 	GameObject& player() {
 		return layers[LAYER_IDX_CHARACTERS][playerIndex];
@@ -129,7 +136,7 @@ int main(int argc, char* argv[])
 	res.load(state);
 
 	// game data
-	GameState gs;
+	GameState gs(state);
 	createTiles(state, gs, res);
 
 	// game loop
@@ -172,6 +179,8 @@ int main(int argc, char* argv[])
 			}
 		}
 
+		gs.mapViewport.x = (gs.player().position.x + TILE_SIZE / 2) - gs.mapViewport.w / 2;
+		gs.mapViewport.y = (gs.player().position.y + TILE_SIZE / 2) - gs.mapViewport.h / 2;
 
 		// render tasks
 		SDL_SetRenderDrawColor(state.renderer, 128, 128, 128, 255);
@@ -184,6 +193,10 @@ int main(int argc, char* argv[])
 				drawObject(state, gs, obj, deltaTime);
 			}
 		}
+
+		SDL_SetRenderDrawColor(state.renderer, 255, 255, 255, 255);
+		SDL_RenderDebugText(state.renderer, 5, 5,
+			format("state: {}", static_cast<int>(gs.player().data.player.state)).c_str());
 
 		// buffer swap 
 		SDL_RenderPresent(state.renderer);
@@ -246,7 +259,7 @@ inline glm::vec2 orthoToIso(int col, int row, int tileSize, const SDLState& stat
 }
 
 	// iso to ortho method ----
-	void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& deltaTime) {
+void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& deltaTime) {
 
 	const float spriteWidth = obj.sprite_width;
 	const float spriteHeight = obj.sprite_height;
@@ -266,8 +279,8 @@ inline glm::vec2 orthoToIso(int col, int row, int tileSize, const SDLState& stat
 		.h = spriteHeight
 	};
 	SDL_FRect dst{
-		.x = obj.position.x,
-		.y = obj.position.y,
+		.x = obj.position.x - gs.mapViewport.x,
+		.y = obj.position.y - gs.mapViewport.y,
 		.w = spriteWidth * obj.scale,
 		.h = spriteHeight * obj.scale
 	};
@@ -507,13 +520,6 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 				obj.velocity.y = (obj.velocity.y > 0 ? 1 : -1) * obj.maxSpeedY;
 			}
 		}
-
-		//if (std::abs(obj.velocity.x) > obj.maxSpeedX) {
-		//	obj.velocity.x = (obj.velocity.x > 0 ? 1 : -1) * obj.maxSpeedX;
-		//}
-		//if (std::abs(obj.velocity.y) > obj.maxSpeedY) {
-		//	obj.velocity.y = (obj.velocity.y > 0 ? 1 : -1) * obj.maxSpeedY;
-		//}
 
 		// add velocity to position
 		obj.position += obj.velocity * deltaTime;
@@ -849,5 +855,5 @@ void createTiles(SDLState& state, GameState& gs, const Resources& res) {
 
 void handleKeyInput(const SDLState& state, GameState& gs, GameObject& obj, SDL_Scancode key, bool keyDown) {
 	const float DASH_FORCE = 200.0f;
-
+	// todo dash
 }

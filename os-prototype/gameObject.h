@@ -5,7 +5,7 @@
 #include "animation.h"
 
 enum class PlayerState {
-	idle, running
+	idle, running, dashing
 };
 
 struct PlayerData {
