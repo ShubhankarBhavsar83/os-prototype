@@ -248,22 +248,16 @@ inline glm::vec2 orthoToIso(int col, int row, int tileSize, const SDLState& stat
 	// iso to ortho method ----
 	void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& deltaTime) {
 
-
 	const float spriteWidth = obj.sprite_width;
 	const float spriteHeight = obj.sprite_height;
 
-
-
 	float srcX = obj.currentAnimation != -1 ? obj.animations[obj.currentAnimation].currentFrame() * spriteWidth : 0.0f;
-	// srcY - for 2D spite matrix -- todo
 	float srcY = 0.0f;
 	if (obj.type == ObjectType::player) {
 		if (obj.verticalSpriteIndex != 0) {
-			srcY = ((obj.verticalSpriteIndex) * obj.sprite_height);
+			srcY = (obj.verticalSpriteIndex * obj.sprite_height);
 		}
 	}
-	SDL_SetRenderDrawColor(state.renderer, 0, 0, 0, 255);
-	SDL_RenderDebugText(state.renderer, 5, 5, std::format("srcY: {}", srcY).c_str());
 
 	SDL_FRect src{
 		.x = srcX,
@@ -296,25 +290,25 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 			float Y = 0.0;
 		};
 
-		MoveDirectionSet mds{ 0, 0 };
+		MoveDirectionSet movementDirectionSet{ 0, 0 };
 
 		////movement 
 		float HorizontalDirection = 0;
 		float VerticalDirection = 0;
 		if (state.keys[SDL_SCANCODE_A]) {
-			mds.X += -1;
+			movementDirectionSet.X += -1;
 			accX += -base_accel;
 		}
 		if (state.keys[SDL_SCANCODE_D]) {
-			mds.X += 1;
+			movementDirectionSet.X += 1;
 			accX += base_accel;
 		}
 		if (state.keys[SDL_SCANCODE_W]) {
-			mds.Y += -1;
+			movementDirectionSet.Y += -1;
 			accY += -base_accel;
 		}
 		if (state.keys[SDL_SCANCODE_S]) {
-			mds.Y += 1;
+			movementDirectionSet.Y += 1;
 			accY += base_accel;
 		}
 
@@ -323,13 +317,13 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 		switch (obj.data.player.state) {
 
 			case PlayerState::idle: {
-				if ((mds.X != 0) || (mds.Y != 0)) {
+				if ((movementDirectionSet.X != 0) || (movementDirectionSet.Y != 0)) {
 					obj.data.player.state = PlayerState::running;
 				}
 				else {
 					// deceleration for X movement
 					if (obj.velocity.x != 0) {
-						const float factor = obj.velocity.x > 0 ? accX = base_decel : accX = -base_decel;
+						const float factor = obj.velocity.x > 0 ? accX += base_decel : accX += -base_decel;
 						float amount = factor * base_accel /*base acceleration value*/ * deltaTime;
 						if (std::abs(obj.velocity.x) < std::abs(amount)) {
 							obj.velocity.x = 0;
@@ -340,7 +334,7 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 					}
 					// deceleration for Y movement
 					if (obj.velocity.y != 0) {
-						const float factor = obj.velocity.y > 0 ? accY = base_decel : accY = -base_decel;
+						const float factor = obj.velocity.y > 0 ? accY += base_decel : accY += -base_decel;
 						float amount = factor * base_accel /*base acceleration value*/ * deltaTime;
 						if (std::abs(obj.velocity.y) < std::abs(amount)) {
 							obj.velocity.y = 0;
@@ -355,7 +349,7 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 				break;
 			}
 			case PlayerState::running: {
-				if ((mds.X == 0) && (mds.Y == 0)) {
+				if ((movementDirectionSet.X == 0) && (movementDirectionSet.Y == 0)) {
 					obj.data.player.state = PlayerState::idle;
 					obj.texture = res.texPlayerIdle;
 
@@ -407,10 +401,10 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 
 					}
 				}
-				else if ((mds.X != 0) || (mds.Y != 0)) {
+				else if ((movementDirectionSet.X != 0) || (movementDirectionSet.Y != 0)) {
 						obj.texture = res.texPlayerRun;
 
-					if (mds.X == 0) {
+					if (movementDirectionSet.X == 0) {
 						// deceleration for X movement
 						if (obj.velocity.x != 0) {
 							const float factor = obj.velocity.x > 0 ? accX = base_decel : accX = -base_decel;
@@ -423,7 +417,7 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 							}
 						}
 					}
-					if(mds.Y == 0) {
+					if(movementDirectionSet.Y == 0) {
 						// deceleration for Y movement
 						if (obj.velocity.y != 0) {
 							const float factor = obj.velocity.y > 0 ? accY = base_decel : accY = -base_decel;
@@ -439,8 +433,8 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 						}
 					}
 
-					obj.directionHorizontal = mds.X;
-					obj.directionVertical = mds.Y;
+					obj.directionHorizontal = movementDirectionSet.X;
+					obj.directionVertical = movementDirectionSet.Y;
 
 
 					if (obj.directionHorizontal > 0 && (int)obj.directionVertical == 0) {
@@ -497,12 +491,29 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 		// add acceleration to velocity 
 		obj.velocity += obj.acceleration * deltaTime;
 
-		if (std::abs(obj.velocity.x) > obj.maxSpeedX) {
-			obj.velocity.x = (obj.velocity.x > 0 ? 1 : -1) * obj.maxSpeedX;
+		if (obj.directionHorizontal != 0 && obj.directionVertical != 0) {
+			if (std::abs(obj.velocity.x) > obj.maxSpeedX) {
+				obj.velocity.x = (obj.velocity.x > 0 ? 1 : -1) * (obj.maxSpeedX - (obj.maxSpeedX * 0.40f));
+			}
+			if (std::abs(obj.velocity.y) > obj.maxSpeedY) {
+				obj.velocity.y = (obj.velocity.y > 0 ? 1 : -1) * (obj.maxSpeedY - (obj.maxSpeedY * 0.40f));
+			}
 		}
-		if (std::abs(obj.velocity.y) > obj.maxSpeedY) {
-			obj.velocity.y = (obj.velocity.y > 0 ? 1 : -1) * obj.maxSpeedY;
+		else if (obj.directionHorizontal != 0 || obj.directionVertical != 0) {
+			if (std::abs(obj.velocity.x) > obj.maxSpeedX) {
+				obj.velocity.x = (obj.velocity.x > 0 ? 1 : -1) * obj.maxSpeedX;
+			}
+			if (std::abs(obj.velocity.y) > obj.maxSpeedY) {
+				obj.velocity.y = (obj.velocity.y > 0 ? 1 : -1) * obj.maxSpeedY;
+			}
 		}
+
+		//if (std::abs(obj.velocity.x) > obj.maxSpeedX) {
+		//	obj.velocity.x = (obj.velocity.x > 0 ? 1 : -1) * obj.maxSpeedX;
+		//}
+		//if (std::abs(obj.velocity.y) > obj.maxSpeedY) {
+		//	obj.velocity.y = (obj.velocity.y > 0 ? 1 : -1) * obj.maxSpeedY;
+		//}
 
 		// add velocity to position
 		obj.position += obj.velocity * deltaTime;
