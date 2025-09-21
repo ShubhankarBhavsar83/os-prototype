@@ -34,8 +34,8 @@ const size_t LAYER_IDX_FURNITURE_BACKGROUND = 1;
 const size_t LAYER_IDX_CHARACTERS = 2;
 const size_t LAYER_IDX_FURNITURE_FOREGROUND = 3;
 
-const int MAP_ROWS = 25;
-const int MAP_COLS = 25;
+const int MAP_ROWS = 100;
+const int MAP_COLS = 100;
 const int TILE_SIZE = 32;
 
 struct GameState {
@@ -58,13 +58,14 @@ struct GameState {
 };
 
 struct Resources {
-	const int ANIM_EIGHT_RUNNER = 0;
-	const int ANIM_EIGHT_IDLE = 1;
+	const int ANIM_PLAYER_RUN = 0;
+	const int ANIM_PLAYER_IDLE = 1;
+	const int ANIM_PLAYER_ROLL = 2;
 
 	vector<Animation> playerAnimations;
 
 	vector <SDL_Texture*> textures;
-	SDL_Texture* texPlayerRun, *texPlayerIdle,
+	SDL_Texture* texPlayerRun, *texPlayerIdle, * texPlayerRoll,
 		* texDirt, * texGrass, * texDirtPillar;
 
 	SDL_Texture* loadTexture(SDL_Renderer* renderer, const string& filepath) {
@@ -76,13 +77,16 @@ struct Resources {
 	}
 
 	void load(SDLState& state) {
-		playerAnimations.resize(20);
+		playerAnimations.resize(5);
 
-		playerAnimations[ANIM_EIGHT_RUNNER] = Animation(15, 0.7);
-		playerAnimations[ANIM_EIGHT_IDLE] = Animation(15, 0.9);
+		playerAnimations[ANIM_PLAYER_RUN] = Animation(15, 0.7);
+		playerAnimations[ANIM_PLAYER_IDLE] = Animation(15, 0.9);
+		playerAnimations[ANIM_PLAYER_ROLL] = Animation(15, 0.7);
 
 		texPlayerRun = loadTexture(state.renderer, "assets/player_assets/Run.png");
 		texPlayerIdle = loadTexture(state.renderer, "assets/player_assets/Idle.png");
+		texPlayerRoll = loadTexture(state.renderer, "assets/player_assets/Rolling.png");
+
 
 
 		texDirt = loadTexture(state.renderer, "assets/map_assets/tile_003.png");
@@ -107,12 +111,14 @@ bool initialize(SDLState& state);
 void cleanup(SDLState& state);
 inline glm::vec2 orthoToIso(int col, int row, int tileSize, const SDLState& state);
 void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& deltaTime);
+void movementUpdate(SDLState& state, GameObject& obj, float deltaTime, float maxSpeedX, float maxSpeedY);
 void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, float deltaTime);
 void collisionResponse(GameObject& objA, SDL_FRect rectC);
 void checkCollision(GameObject& objA, GameObject& objB);
 auto createObject(int r, int c, SDL_Texture* tex, ObjectType type, const SDLState& state);
 auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c,SDLState& state, GameState& gs, const Resources& res);
 void createTiles(SDLState& state, GameState& gs, const Resources& res);
+void dash(const SDLState& state, GameState& gs, GameObject& obj, SDL_Scancode key, bool keyDown);
 void handleKeyInput(const SDLState& state, GameState& gs, GameObject& obj, SDL_Scancode key, bool keyDown);
 
 int main(int argc, char* argv[])
@@ -289,9 +295,51 @@ void drawObject(const SDLState& state, GameState& gs, GameObject& obj, float& de
 	SDL_RenderTexture(state.renderer, obj.texture, &src, &dst);
 }
 
+void movementUpdate(SDLState &state, GameObject &obj, float deltaTime, float maxSpeedX, float maxSpeedY) {
+	// add acceleration to velocity 
+	if (obj.data.player.state == PlayerState::dashing) {
+		obj.acceleration.x = obj.acceleration.x * 2;
+		obj.acceleration.y = obj.acceleration.y * 2;
+
+		obj.velocity += obj.acceleration * deltaTime;
+	}
+	else {
+		obj.velocity += obj.acceleration * deltaTime;
+		maxSpeedX = obj.maxSpeedX;
+		maxSpeedY = obj.maxSpeedY;
+	}
+
+	if (obj.directionHorizontal != 0 && obj.directionVertical != 0) {
+		if (std::abs(obj.velocity.x) > maxSpeedX) {
+			obj.velocity.x = (obj.velocity.x > 0 ? 1 : -1) * (maxSpeedX - (maxSpeedX * 0.40f));
+		}
+		if (std::abs(obj.velocity.y) > maxSpeedY) {
+			obj.velocity.y = (obj.velocity.y > 0 ? 1 : -1) * (maxSpeedY - (maxSpeedY * 0.40f));
+		}
+	}
+	else if (obj.directionHorizontal != 0 || obj.directionVertical != 0) {
+		if (std::abs(obj.velocity.x) > maxSpeedX) {
+			obj.velocity.x = (obj.velocity.x > 0 ? 1 : -1) * maxSpeedX;
+		}
+		if (std::abs(obj.velocity.y) > maxSpeedY) {
+			obj.velocity.y = (obj.velocity.y > 0 ? 1 : -1) * maxSpeedY;
+		}
+	}
+
+	// add velocity to position
+	obj.position += obj.velocity * deltaTime;
+	state.playerY = obj.position.y;
+	state.playerX = obj.position.x;
+}
+
 void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, float deltaTime) {
 
 	if (obj.type == ObjectType::player) {
+
+		if (obj.dashDuration > obj.dashCooldown) {
+			obj.dashCooldownMark = 0;
+			obj.dashDuration = 0;
+		}
 
 		float accX = 0.0;
 		float accY = 0.0;
@@ -359,6 +407,8 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 						}
 					}
 				}
+				// Update accel -> velocity -> position
+				movementUpdate(state, obj, deltaTime, obj.maxSpeedX, obj.maxSpeedY);
 				break;
 			}
 			case PlayerState::running: {
@@ -366,50 +416,58 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 					obj.data.player.state = PlayerState::idle;
 					obj.texture = res.texPlayerIdle;
 
-					obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+					obj.currentAnimation = res.ANIM_PLAYER_IDLE;
 
 					if (obj.directionHorizontal > 0 && (int)obj.directionVertical == 0) {
 						obj.verticalSpriteIndex = 0;
-						obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+						obj.currentAnimation = res.ANIM_PLAYER_IDLE;
+						obj.dashDirection = 1;
 
 
 					}
 					else if (obj.directionHorizontal > 0 && obj.directionVertical > 0) {
 						obj.verticalSpriteIndex = 1;
-						obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+						obj.currentAnimation = res.ANIM_PLAYER_IDLE;
+						obj.dashDirection = 1;
 
 
 					}
 					else if ((int)obj.directionHorizontal == 0 && obj.directionVertical > 0) {
 						obj.verticalSpriteIndex = 2;
-						obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+						obj.currentAnimation = res.ANIM_PLAYER_IDLE;
+						obj.dashDirection = 2;
 
 
 					}
 					else if (obj.directionHorizontal < 0 && obj.directionVertical > 0) {
 						obj.verticalSpriteIndex = 3;
-						obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+						obj.currentAnimation = res.ANIM_PLAYER_IDLE;
+						obj.dashDirection = 3;
 
 
 					}
 					else if (obj.directionHorizontal < 0 && (int)obj.directionVertical == 0) {
 						obj.verticalSpriteIndex = 4;
-						obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+						obj.currentAnimation = res.ANIM_PLAYER_IDLE;
+						obj.dashDirection = 4;
 
 					}
 					else if (obj.directionHorizontal < 0 && obj.directionVertical < 0) {
 						obj.verticalSpriteIndex = 5;
-						obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+						obj.currentAnimation = res.ANIM_PLAYER_IDLE;
+						obj.dashDirection = 5;
 
 					}
 					else if ((int)obj.directionHorizontal == 0 && obj.directionVertical < 0) {
 						obj.verticalSpriteIndex = 6;
-						obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+						obj.currentAnimation = res.ANIM_PLAYER_IDLE;
+						obj.dashDirection = 6;
 
 					}
 					else if (obj.directionHorizontal > 0 && obj.directionVertical < 0) {
 						obj.verticalSpriteIndex = 7;
-						obj.currentAnimation = res.ANIM_EIGHT_IDLE;
+						obj.currentAnimation = res.ANIM_PLAYER_IDLE;
+						obj.dashDirection = 7;
 
 
 					}
@@ -452,83 +510,92 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 
 					if (obj.directionHorizontal > 0 && (int)obj.directionVertical == 0) {
 						obj.verticalSpriteIndex = 0;
-						obj.currentAnimation = res.ANIM_EIGHT_RUNNER;
+						obj.currentAnimation = res.ANIM_PLAYER_RUN;
+						obj.dashDirection = 0;
 
 
 					} 
 					else if (obj.directionHorizontal > 0 && obj.directionVertical > 0) {
 						obj.verticalSpriteIndex = 1;
-						obj.currentAnimation = res.ANIM_EIGHT_RUNNER;
+						obj.currentAnimation = res.ANIM_PLAYER_RUN;
+						obj.dashDirection = 1;
 
 
 					}
 					else if ((int)obj.directionHorizontal == 0 && obj.directionVertical > 0) {
 						obj.verticalSpriteIndex = 2;
-						obj.currentAnimation = res.ANIM_EIGHT_RUNNER;
+						obj.currentAnimation = res.ANIM_PLAYER_RUN;
+						obj.dashDirection = 2;
 
 
 					}
 					else if (obj.directionHorizontal < 0 && obj.directionVertical > 0) {
 						obj.verticalSpriteIndex = 3;
-						obj.currentAnimation = res.ANIM_EIGHT_RUNNER;
+						obj.currentAnimation = res.ANIM_PLAYER_RUN;
+						obj.dashDirection = 3;
 
 
 					}
 					else if (obj.directionHorizontal < 0 && (int)obj.directionVertical == 0) {
 						obj.verticalSpriteIndex = 4;
-						obj.currentAnimation = res.ANIM_EIGHT_RUNNER;
+						obj.currentAnimation = res.ANIM_PLAYER_RUN;
+						obj.dashDirection = 4;
 
 					}
 					else if (obj.directionHorizontal < 0 && obj.directionVertical < 0) {
 						obj.verticalSpriteIndex = 5;
-						obj.currentAnimation = res.ANIM_EIGHT_RUNNER;
+						obj.currentAnimation = res.ANIM_PLAYER_RUN;
+						obj.dashDirection = 5;
 
 					}
 					else if ((int)obj.directionHorizontal == 0 && obj.directionVertical < 0) {
 						obj.verticalSpriteIndex = 6;
-						obj.currentAnimation = res.ANIM_EIGHT_RUNNER;
+						obj.currentAnimation = res.ANIM_PLAYER_RUN;
+						obj.dashDirection = 6;
 
 					}
 					else if (obj.directionHorizontal > 0 && obj.directionVertical < 0) {
- 						obj.verticalSpriteIndex = 7;
-						obj.currentAnimation = res.ANIM_EIGHT_RUNNER;
-
+						obj.verticalSpriteIndex = 7;
+						obj.currentAnimation = res.ANIM_PLAYER_RUN;
+						obj.dashDirection = 7;
 
 					}
+				}
+				// Update accel -> velocity -> position
+				movementUpdate(state, obj, deltaTime, obj.maxSpeedX, obj.maxSpeedY);
+				break;
+			}
+			case PlayerState::dashing: {
+
+				uint64_t nowTime = SDL_GetTicks();
+
+				if (obj.dashCooldownMark != 0) {
+					// do dash - following increment
+					obj.dashDuration = nowTime - obj.dashCooldownMark;
+					if (obj.dashDuration > 700) {
+
+						obj.data.player.state = PlayerState::running;
+					}
+					else {
+						obj.texture = res.texPlayerRoll;
+						obj.currentAnimation = res.ANIM_PLAYER_ROLL;
+
+						movementUpdate(state, obj, deltaTime, obj.dashingSpeedX, obj.dashingSpeedY);
+					}
+				}
+				else {
+					//set mark
+					uint64_t markTime = SDL_GetTicks();
+					obj.dashCooldownMark = markTime;
+
 				}
 				break;
 			}
 		}
-
-
-		// add acceleration to velocity 
-		obj.velocity += obj.acceleration * deltaTime;
-
-		if (obj.directionHorizontal != 0 && obj.directionVertical != 0) {
-			if (std::abs(obj.velocity.x) > obj.maxSpeedX) {
-				obj.velocity.x = (obj.velocity.x > 0 ? 1 : -1) * (obj.maxSpeedX - (obj.maxSpeedX * 0.40f));
-			}
-			if (std::abs(obj.velocity.y) > obj.maxSpeedY) {
-				obj.velocity.y = (obj.velocity.y > 0 ? 1 : -1) * (obj.maxSpeedY - (obj.maxSpeedY * 0.40f));
-			}
-		}
-		else if (obj.directionHorizontal != 0 || obj.directionVertical != 0) {
-			if (std::abs(obj.velocity.x) > obj.maxSpeedX) {
-				obj.velocity.x = (obj.velocity.x > 0 ? 1 : -1) * obj.maxSpeedX;
-			}
-			if (std::abs(obj.velocity.y) > obj.maxSpeedY) {
-				obj.velocity.y = (obj.velocity.y > 0 ? 1 : -1) * obj.maxSpeedY;
-			}
-		}
-
-		// add velocity to position
-		obj.position += obj.velocity * deltaTime;
-		state.playerY = obj.position.y;
-		state.playerX = obj.position.x;
-
-
 	}
 
+
+	//handle layering relative to player
 	float playerXrangeStart = state.playerX - (state.logW * 0.50f);
 	float playerXrangeEnd = state.playerX + (state.logW * 0.50f);
 
@@ -692,12 +759,12 @@ auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, SDLState& state, GameS
 			state.playerX = player.position.x;
 
 			player.animations = res.playerAnimations;
-			player.currentAnimation = res.ANIM_EIGHT_IDLE;
+			player.currentAnimation = res.ANIM_PLAYER_IDLE;
 			player.verticalSpriteIndex = 0;
 
 
 			player.maxSpeedX = 50;
-			player.maxSpeedY = 50;
+			player.maxSpeedY = 35;
 
 			player.sprite_width = 128.0f;
 			player.sprite_height = 128.0f;
@@ -706,8 +773,8 @@ auto drawAll(short map[MAP_ROWS][MAP_COLS], int r, int c, SDLState& state, GameS
 
 			player.collider.right = 45.0f * player.scale;
 			player.collider.left = 49.0f * player.scale;
-			player.collider.top = 48.0f * player.scale;
-			player.collider.bottom = 30.0f * player.scale;
+			player.collider.top = 39.0f * player.scale;
+			player.collider.bottom = 39.0f * player.scale;
 
 			gs.layers[LAYER_IDX_CHARACTERS].push_back(player);
 			gs.playerIndex = gs.layers[LAYER_IDX_CHARACTERS].size() - 1;
@@ -806,30 +873,30 @@ void createTiles(SDLState& state, GameState& gs, const Resources& res) {
 	short furniture_map[MAP_ROWS][MAP_COLS] =
 	{
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
 	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5}
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 	};
 
 
@@ -853,7 +920,31 @@ void createTiles(SDLState& state, GameState& gs, const Resources& res) {
 	assert(gs.playerIndex != -1);
 }
 
+
 void handleKeyInput(const SDLState& state, GameState& gs, GameObject& obj, SDL_Scancode key, bool keyDown) {
-	const float DASH_FORCE = 200.0f;
 	// todo dash
+
+	if (obj.type == ObjectType::player) {
+		switch (obj.data.player.state) {
+			case PlayerState::idle: {
+				if (key == SDL_SCANCODE_L && keyDown == true) {
+					if (obj.dashDuration < obj.dashCooldown) {
+						obj.data.player.state = PlayerState::dashing;
+
+					}
+				}
+				break;
+			}
+			case PlayerState::running: {
+				if (key == SDL_SCANCODE_L && keyDown == true) {
+
+					if (obj.dashDuration < obj.dashCooldown) {
+						obj.data.player.state = PlayerState::dashing;
+
+					}
+				}
+				break;
+			}
+		}
+	}
 }
