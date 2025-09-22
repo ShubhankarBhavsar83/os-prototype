@@ -64,6 +64,7 @@ struct GameObject {
 	float dashingSpeedX;
 	float dashingSpeedY;
 	long dashDuration;
+	long dashDurationMax;
 	float dashCooldown;
 	long dashCooldownMark;
 	short dashDirection;  // up - 0, top right - 1, right - 2, bottom right - 3 , down - 4, bottom left - 5 , left - 6 , top left - 7
@@ -92,12 +93,14 @@ struct GameObject {
 		directionHorizontal = 1;
 		maxSpeedX = 0;
 		maxSpeedY = 0;
+		baseSpeed = 50;
+
 
 		dashAccel = 700;
-		baseSpeed = 50;
 		dashingSpeedX = 100;
 		dashingSpeedY = 70;
 		dashDuration = 0;
+		dashDurationMax = 700;
 		dashCooldown = 5000;
 		dashCooldownMark = 0.0f;
 

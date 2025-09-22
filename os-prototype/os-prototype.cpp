@@ -34,8 +34,8 @@ const size_t LAYER_IDX_FURNITURE_BACKGROUND = 1;
 const size_t LAYER_IDX_CHARACTERS = 2;
 const size_t LAYER_IDX_FURNITURE_FOREGROUND = 3;
 
-const int MAP_ROWS = 100;
-const int MAP_COLS = 100;
+const int MAP_ROWS = 25;
+const int MAP_COLS = 25;
 const int TILE_SIZE = 32;
 
 struct GameState {
@@ -303,11 +303,12 @@ void movementUpdate(SDLState &state, GameObject &obj, float deltaTime, float max
 
 		obj.velocity += obj.acceleration * deltaTime;
 	}
-	else {
+	else if (obj.data.player.state == PlayerState::running){
 		obj.velocity += obj.acceleration * deltaTime;
 		maxSpeedX = obj.maxSpeedX;
 		maxSpeedY = obj.maxSpeedY;
 	}
+
 
 	if (obj.directionHorizontal != 0 && obj.directionVertical != 0) {
 		if (std::abs(obj.velocity.x) > maxSpeedX) {
@@ -372,7 +373,8 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 			movementDirectionSet.Y += 1;
 			accY += base_accel;
 		}
-
+		obj.directionHorizontal = movementDirectionSet.X;
+		obj.directionVertical = movementDirectionSet.Y;
 		obj.acceleration = glm::vec2(accX, accY);
 
 		switch (obj.data.player.state) {
@@ -504,10 +506,6 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 						}
 					}
 
-					obj.directionHorizontal = movementDirectionSet.X;
-					obj.directionVertical = movementDirectionSet.Y;
-
-
 					if (obj.directionHorizontal > 0 && (int)obj.directionVertical == 0) {
 						obj.verticalSpriteIndex = 0;
 						obj.currentAnimation = res.ANIM_PLAYER_RUN;
@@ -569,16 +567,51 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 
 				uint64_t nowTime = SDL_GetTicks();
 
+
 				if (obj.dashCooldownMark != 0) {
 					// do dash - following increment
 					obj.dashDuration = nowTime - obj.dashCooldownMark;
-					if (obj.dashDuration > 700) {
-
+					if (obj.dashDuration > obj.dashDurationMax) {
 						obj.data.player.state = PlayerState::running;
 					}
 					else {
+
 						obj.texture = res.texPlayerRoll;
 						obj.currentAnimation = res.ANIM_PLAYER_ROLL;
+
+
+						if (obj.directionHorizontal > 0 && (int)obj.directionVertical == 0) {
+							obj.verticalSpriteIndex = 0;
+
+						}
+						else if (obj.directionHorizontal > 0 && obj.directionVertical > 0) {
+							obj.verticalSpriteIndex = 1;
+
+						}
+						else if ((int)obj.directionHorizontal == 0 && obj.directionVertical > 0) {
+							obj.verticalSpriteIndex = 2;
+
+						}
+						else if (obj.directionHorizontal < 0 && obj.directionVertical > 0) {
+							obj.verticalSpriteIndex = 3;
+
+						}
+						else if (obj.directionHorizontal < 0 && (int)obj.directionVertical == 0) {
+							obj.verticalSpriteIndex = 4;
+
+						}
+						else if (obj.directionHorizontal < 0 && obj.directionVertical < 0) {
+							obj.verticalSpriteIndex = 5;
+
+						}
+						else if ((int)obj.directionHorizontal == 0 && obj.directionVertical < 0) {
+							obj.verticalSpriteIndex = 6;
+
+						}
+						else if (obj.directionHorizontal > 0 && obj.directionVertical < 0) {
+							obj.verticalSpriteIndex = 7;
+
+						}
 
 						movementUpdate(state, obj, deltaTime, obj.dashingSpeedX, obj.dashingSpeedY);
 					}
@@ -938,10 +971,10 @@ void handleKeyInput(const SDLState& state, GameState& gs, GameObject& obj, SDL_S
 			case PlayerState::running: {
 				if (key == SDL_SCANCODE_L && keyDown == true) {
 
-					if (obj.dashDuration < obj.dashCooldown) {
+					//if (obj.dashDuration < obj.dashCooldown) {
 						obj.data.player.state = PlayerState::dashing;
 
-					}
+					//}
 				}
 				break;
 			}
