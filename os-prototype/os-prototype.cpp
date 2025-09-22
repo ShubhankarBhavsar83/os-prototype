@@ -336,10 +336,15 @@ void movementUpdate(SDLState &state, GameObject &obj, float deltaTime, float max
 void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, float deltaTime) {
 
 	if (obj.type == ObjectType::player) {
+		uint64_t nowTime = SDL_GetTicks();
+		obj.dashDuration = nowTime - obj.dashCooldownMark;
+
 
 		if (obj.dashDuration > obj.dashCooldown) {
 			obj.dashCooldownMark = 0;
 			obj.dashDuration = 0;
+			obj.dashOnCd = false;
+
 		}
 
 		float accX = 0.0;
@@ -423,54 +428,41 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 					if (obj.directionHorizontal > 0 && (int)obj.directionVertical == 0) {
 						obj.verticalSpriteIndex = 0;
 						obj.currentAnimation = res.ANIM_PLAYER_IDLE;
-						obj.dashDirection = 1;
-
 
 					}
 					else if (obj.directionHorizontal > 0 && obj.directionVertical > 0) {
 						obj.verticalSpriteIndex = 1;
 						obj.currentAnimation = res.ANIM_PLAYER_IDLE;
-						obj.dashDirection = 1;
-
 
 					}
 					else if ((int)obj.directionHorizontal == 0 && obj.directionVertical > 0) {
 						obj.verticalSpriteIndex = 2;
 						obj.currentAnimation = res.ANIM_PLAYER_IDLE;
-						obj.dashDirection = 2;
-
 
 					}
 					else if (obj.directionHorizontal < 0 && obj.directionVertical > 0) {
 						obj.verticalSpriteIndex = 3;
 						obj.currentAnimation = res.ANIM_PLAYER_IDLE;
-						obj.dashDirection = 3;
-
 
 					}
 					else if (obj.directionHorizontal < 0 && (int)obj.directionVertical == 0) {
 						obj.verticalSpriteIndex = 4;
 						obj.currentAnimation = res.ANIM_PLAYER_IDLE;
-						obj.dashDirection = 4;
 
 					}
 					else if (obj.directionHorizontal < 0 && obj.directionVertical < 0) {
 						obj.verticalSpriteIndex = 5;
 						obj.currentAnimation = res.ANIM_PLAYER_IDLE;
-						obj.dashDirection = 5;
 
 					}
 					else if ((int)obj.directionHorizontal == 0 && obj.directionVertical < 0) {
 						obj.verticalSpriteIndex = 6;
 						obj.currentAnimation = res.ANIM_PLAYER_IDLE;
-						obj.dashDirection = 6;
 
 					}
 					else if (obj.directionHorizontal > 0 && obj.directionVertical < 0) {
 						obj.verticalSpriteIndex = 7;
 						obj.currentAnimation = res.ANIM_PLAYER_IDLE;
-						obj.dashDirection = 7;
-
 
 					}
 				}
@@ -509,53 +501,41 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 					if (obj.directionHorizontal > 0 && (int)obj.directionVertical == 0) {
 						obj.verticalSpriteIndex = 0;
 						obj.currentAnimation = res.ANIM_PLAYER_RUN;
-						obj.dashDirection = 0;
-
 
 					} 
 					else if (obj.directionHorizontal > 0 && obj.directionVertical > 0) {
 						obj.verticalSpriteIndex = 1;
 						obj.currentAnimation = res.ANIM_PLAYER_RUN;
-						obj.dashDirection = 1;
-
 
 					}
 					else if ((int)obj.directionHorizontal == 0 && obj.directionVertical > 0) {
 						obj.verticalSpriteIndex = 2;
 						obj.currentAnimation = res.ANIM_PLAYER_RUN;
-						obj.dashDirection = 2;
-
 
 					}
 					else if (obj.directionHorizontal < 0 && obj.directionVertical > 0) {
 						obj.verticalSpriteIndex = 3;
 						obj.currentAnimation = res.ANIM_PLAYER_RUN;
-						obj.dashDirection = 3;
-
 
 					}
 					else if (obj.directionHorizontal < 0 && (int)obj.directionVertical == 0) {
 						obj.verticalSpriteIndex = 4;
 						obj.currentAnimation = res.ANIM_PLAYER_RUN;
-						obj.dashDirection = 4;
 
 					}
 					else if (obj.directionHorizontal < 0 && obj.directionVertical < 0) {
 						obj.verticalSpriteIndex = 5;
 						obj.currentAnimation = res.ANIM_PLAYER_RUN;
-						obj.dashDirection = 5;
 
 					}
 					else if ((int)obj.directionHorizontal == 0 && obj.directionVertical < 0) {
 						obj.verticalSpriteIndex = 6;
 						obj.currentAnimation = res.ANIM_PLAYER_RUN;
-						obj.dashDirection = 6;
 
 					}
 					else if (obj.directionHorizontal > 0 && obj.directionVertical < 0) {
 						obj.verticalSpriteIndex = 7;
 						obj.currentAnimation = res.ANIM_PLAYER_RUN;
-						obj.dashDirection = 7;
 
 					}
 				}
@@ -565,14 +545,13 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 			}
 			case PlayerState::dashing: {
 
-				uint64_t nowTime = SDL_GetTicks();
 
 
 				if (obj.dashCooldownMark != 0) {
 					// do dash - following increment
-					obj.dashDuration = nowTime - obj.dashCooldownMark;
 					if (obj.dashDuration > obj.dashDurationMax) {
 						obj.data.player.state = PlayerState::running;
+						obj.dashOnCd = true;
 					}
 					else {
 
@@ -620,7 +599,6 @@ void update(SDLState& state, GameState& gs, Resources& res, GameObject& obj, flo
 					//set mark
 					uint64_t markTime = SDL_GetTicks();
 					obj.dashCooldownMark = markTime;
-
 				}
 				break;
 			}
@@ -961,7 +939,7 @@ void handleKeyInput(const SDLState& state, GameState& gs, GameObject& obj, SDL_S
 		switch (obj.data.player.state) {
 			case PlayerState::idle: {
 				if (key == SDL_SCANCODE_L && keyDown == true) {
-					if (obj.dashDuration < obj.dashCooldown) {
+					if (obj.dashOnCd == false) {
 						obj.data.player.state = PlayerState::dashing;
 
 					}
@@ -971,10 +949,10 @@ void handleKeyInput(const SDLState& state, GameState& gs, GameObject& obj, SDL_S
 			case PlayerState::running: {
 				if (key == SDL_SCANCODE_L && keyDown == true) {
 
-					//if (obj.dashDuration < obj.dashCooldown) {
+					if (obj.dashOnCd == false) {
 						obj.data.player.state = PlayerState::dashing;
 
-					//}
+					}
 				}
 				break;
 			}

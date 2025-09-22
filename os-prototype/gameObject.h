@@ -67,7 +67,7 @@ struct GameObject {
 	long dashDurationMax;
 	float dashCooldown;
 	long dashCooldownMark;
-	short dashDirection;  // up - 0, top right - 1, right - 2, bottom right - 3 , down - 4, bottom left - 5 , left - 6 , top left - 7
+	bool dashOnCd;
 
 	float sprite_width;
 	float sprite_height;
@@ -95,7 +95,7 @@ struct GameObject {
 		maxSpeedY = 0;
 		baseSpeed = 50;
 
-
+		dashOnCd = false;
 		dashAccel = 700;
 		dashingSpeedX = 100;
 		dashingSpeedY = 70;
