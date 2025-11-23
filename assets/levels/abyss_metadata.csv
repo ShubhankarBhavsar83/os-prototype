@@ -1,0 +1,9 @@
+Asset_name,asset_id,layer_name,layer_number,grid_height,grid_width
+tile_1,1,Terrain,0,25,25
+tile_3,3,Player,1,25,25
+tile_10,10,Terrain,0,25,25
+tile_17,17,Terrain,0,25,25
+tile_54,54,Player,1,25,25
+tile_62,62,Furniture,2,25,25
+tile_93,93,Enemy,3,25,25
+tile_106,106,NPCs,4,25,25
