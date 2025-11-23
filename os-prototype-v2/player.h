@@ -13,13 +13,13 @@ private:
     PlayerState state;
 
     // Dash system
-    float dashSpeedX;
-    float dashSpeedY;
+    float dashSpeed;
     float dashDuration;
     float dashDurationMax;
     float dashCooldown;
     uint64_t dashCooldownMark;
     bool canDash;
+    int directionIndex;
 
     // Combat
     Entity* targetEntity;
@@ -28,8 +28,7 @@ private:
     Entity* interactableNearby;
     float interactionRange;
 
-    // Base speeds
-    float baseAcceleration;
+
 
 public:
     Player();
@@ -39,6 +38,7 @@ public:
     void handleCollision(Entity* other) override;
 
     void handleInput(const bool* keyState, GameState& gs);
+    void handleMovement(const bool* keyState, GameState& gs);
     void startDash();
     void attack(GameState& gs);
 

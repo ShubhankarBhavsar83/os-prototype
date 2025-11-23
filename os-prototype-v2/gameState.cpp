@@ -23,6 +23,8 @@ GameState::GameState(SDL_Renderer* renderer, int viewportWidth, int viewportHeig
     resourceManager->loadAllAssets();
 }
 
+
+
 void GameState::update(float deltaTime) {
     if (mode != GameStateMode::PLAYING) return;
 
@@ -38,6 +40,11 @@ void GameState::update(float deltaTime) {
     checkCollisions();
     updateCamera();
     cleanup();
+
+    if (playerPtr && !playerPtr->isActive()) {
+        playerPtr = nullptr;
+    }
+
 }
 
 void GameState::render(SDL_Renderer* renderer) {
@@ -48,10 +55,25 @@ void GameState::render(SDL_Renderer* renderer) {
             }
         }
     }
+
+   /* SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+    for (auto& layer : layers) {
+        for (auto& entity : layer) {
+            if (entity && entity->isActive() && entity->isSolid()) {
+                SDL_FRect box = entity->getBoundingBox();
+
+                box.x -= mapViewport.x;
+                box.y -= mapViewport.y;
+
+                SDL_RenderRect(renderer, &box);
+            }
+        }*/
+    //}
+
 }
 
 void GameState::checkCollisions() {
-    //if (!playerPtr) return;
+    if (!playerPtr) return;
 
     // Check player against all solid entities
     for (auto& layer : layers) {
@@ -200,7 +222,7 @@ void GameState::loadTestLevel() {
     }
 
     // Create player at position (0, 0)
-    glm::vec2 playerPos = CoordinateSystem::orthoToIso(0, 0, TILE_SIZE, logicalWidth, logicalHeight);
+    glm::vec2 playerPos = CoordinateSystem::orthoToIso(3, 3, TILE_SIZE, logicalWidth, logicalHeight);
     auto player = std::make_unique<Player>();
     player->setPosition(playerPos);
     player->texture = resourceManager->getTexture("player_idle");

@@ -25,7 +25,6 @@ struct Collider {
             .w = rectA_width,
             .h = rectA_height - (rectA_height / 2)
         };
-
     }
 
     bool intersects(const Collider& other,

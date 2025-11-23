@@ -4,6 +4,7 @@
 #include <vector>
 #include "Animation.h"
 #include "Collider.h"
+#include "resourceManager.h"
 
 enum class EntityType {
     PLAYER,
@@ -19,18 +20,24 @@ class GameState; // Forward declaration
 class Entity {
 protected:
     int id;
-
     EntityType type;
     size_t currentLayer;
+
     glm::vec2 position;
     glm::vec2 velocity;
     glm::vec2 acceleration;
+    glm::vec2 current_acceleration;
+    glm::vec2 input;
+    float base_acceleration;
+    float base_deceleration;
+
     float spriteWidth;
     float spriteHeight;
     float scale;
     bool solid;
     bool active;
     Collider collider;
+
     int currentAnimation;
     int verticalSpriteIndex;
 

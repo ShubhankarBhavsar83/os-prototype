@@ -112,7 +112,6 @@ void Application::update(float deltaTime) {
             player->handleInput(keyboardState, *gameState);
         }
     }
-
     gameState->update(deltaTime);
 }
 

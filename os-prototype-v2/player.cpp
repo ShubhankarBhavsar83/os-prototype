@@ -1,15 +1,16 @@
 #include "Player.h"
 #include "GameState.h"
 #include <iostream>
+#include "collider.h"
 
 Player::Player()
     : Movable(), state(PlayerState::IDLE),
-    dashSpeedX(150.0f), dashSpeedY(105.0f),
+    dashSpeed(150.0f), // update dash speed after movement normalization
     dashDuration(0), dashDurationMax(700),
     dashCooldown(5000), dashCooldownMark(0),
     canDash(true), targetEntity(nullptr),
     interactableNearby(nullptr), interactionRange(50.0f),
-    baseAcceleration(700.0f) {
+    directionIndex(2) {
 
     type = EntityType::PLAYER;
     id = 100;
@@ -17,9 +18,17 @@ Player::Player()
     spriteHeight = 128.0f;
     scale = 0.3f;
     maxSpeedX = 50.0f;
-    maxSpeedY = 35.0f;
+    maxSpeedY = 50.0f;
+    solid = true;
+    input.x = 0;
+    input.y = 0;
+    base_acceleration = 700.0f;
+    base_deceleration = 5000.0f;
+    setFriction(base_deceleration);
+    maxSpeedX = 50.0f;
+    maxSpeedY = 50.0f;
 
-    collider = Collider(49.0f, 45.0f, 39.0f, 39.0f);
+    collider = Collider(49.0f * scale, 45.0f * scale, 39.0f * scale, 39.0f * scale);
 }
 
 void Player::update(float deltaTime, GameState& gs) {
@@ -37,61 +46,78 @@ void Player::update(float deltaTime, GameState& gs) {
     // State machine
     switch (state) {
     case PlayerState::IDLE: {
+        if (currentAnimation != 1) {
+            playAnimation(1);
+            texture = gs.getResourceManager().getTexture("player_idle");
+        }
         if (directionHorizontal != 0 || directionVertical != 0) {
             state = PlayerState::RUNNING;
         }
-        else {
-            applyFriction(deltaTime, 900.0f);
-        }
-        applyMovement(deltaTime);
+        //clampVelocity(deltaTime);
+        //velocity += acceleration * deltaTime;
+        applyMovement(deltaTime, maxSpeedX, maxSpeedY);
         break;
     }
 
     case PlayerState::RUNNING: {
+        if (currentAnimation != 0) {
+            playAnimation(0);
+            texture = gs.getResourceManager().getTexture("player_run");
+        }
         if (directionHorizontal == 0 && directionVertical == 0) {
             state = PlayerState::IDLE;
         }
-        applyMovement(deltaTime);
+        //clampVelocity(deltaTime);
+        //velocity += acceleration * deltaTime;
+        applyMovement(deltaTime, maxSpeedX, maxSpeedY);
         break;
     }
 
     case PlayerState::DASHING: {
-        if (dashCooldownMark != 0) {
-            if (dashDuration > dashDurationMax) {
-                state = PlayerState::RUNNING;
-                canDash = false;
+
+            texture = gs.getResourceManager().getTexture("player_roll");
+
+
+            if (currentAnimation != 2) {
+                playAnimation(2);
+                texture = gs.getResourceManager().getTexture("player_roll");
             }
-            else {
-                // Continue dash
-                velocity = glm::vec2(
-                    directionHorizontal * dashSpeedX,
-                    directionVertical * dashSpeedY
-                );
-                position += velocity * deltaTime;
+
+            if (dashCooldownMark != 0) {
+                if (dashDuration > dashDurationMax) {
+                    state = PlayerState::IDLE;
+                    canDash = false;
+                }
+                else {
+                    float t = dashSpeed;
+                    velocity = glm::vec2(directionHorizontal * dashSpeed, directionVertical * dashSpeed);
+                    position += velocity * deltaTime;
+                }
             }
+            break;
         }
-        else {
-            dashCooldownMark = SDL_GetTicks();
-        }
-        break;
-    }
     }
 
-    // Update animation
     stepAnimation(deltaTime);
-    Player::verticalSpriteIndex = getDirectionIndex();
+    if (acceleration.x != 0 || acceleration.y != 0) {
+        Player::verticalSpriteIndex = getDirectionIndex();
+    }
 }
+
 
 void Player::render(SDL_Renderer* renderer, const SDL_FRect& viewport) {
     if (!texture) return;
 
-    float srcX = 0;
-    if (currentAnimation >= 0 && currentAnimation < animations.size()) {
-        srcX = animations[currentAnimation].currentFrame() * spriteWidth;
-    }
+
+    float srcX = currentAnimation != -1 ? animations[currentAnimation].currentFrame() * spriteWidth : 0.0f;
+
     float srcY = Player::verticalSpriteIndex * spriteHeight;
 
-    SDL_FRect src = { srcX, srcY, spriteWidth, spriteHeight };
+    SDL_FRect src = { 
+        srcX,
+        srcY,
+        spriteWidth,
+        spriteHeight };
     SDL_FRect dst = {
         position.x - viewport.x,
         position.y - viewport.y,
@@ -132,22 +158,42 @@ void Player::handleCollision(Entity* other) {
 }
 
 void Player::handleInput(const bool* keyState, GameState& gs) {
-    float inputX = 0;
-    float inputY = 0;
 
-    if (keyState[SDL_SCANCODE_A]) inputX -= 1;
-    if (keyState[SDL_SCANCODE_D]) inputX += 1;
-    if (keyState[SDL_SCANCODE_W]) inputY -= 1;
-    if (keyState[SDL_SCANCODE_S]) inputY += 1;
+    current_acceleration = glm::vec2(0.0f, 0.0f);
+    struct MoveDirectionSet {
+        float X = 0.0;
+        float Y = 0.0;
+    };
 
-    setDirection(inputX, inputY);
+    MoveDirectionSet movementDirectionSet{ 0, 0 };
 
-    if (state != PlayerState::DASHING) {
-        acceleration = glm::vec2(inputX * baseAcceleration, inputY * baseAcceleration);
+    if (keyState[SDL_SCANCODE_A]) movementDirectionSet.X -= 1.0f;
+    if (keyState[SDL_SCANCODE_D]) movementDirectionSet.X += 1.0f;
+    if (keyState[SDL_SCANCODE_W]) movementDirectionSet.Y -= 1.0f;
+    if (keyState[SDL_SCANCODE_S]) movementDirectionSet.Y += 1.0f;
+
+    setDirection(movementDirectionSet.X, movementDirectionSet.Y);
+
+    if (movementDirectionSet.X != 0 || movementDirectionSet.Y != 0) {
+
+        glm::vec2 inputDir = glm::vec2(movementDirectionSet.X, movementDirectionSet.Y);
+
+        inputDir = glm::normalize(inputDir);
+
+        current_acceleration = inputDir * base_acceleration;
+
+        input = inputDir;
+    }
+    else {
+        // No keys pressed
+        input = glm::vec2(0.0f, 0.0f);
     }
 
+    acceleration = current_acceleration;
+
+
     // Dash
-    if (keyState[SDL_SCANCODE_L] && canDash && (inputX != 0 || inputY != 0)) {
+    if (keyState[SDL_SCANCODE_L] && canDash && (movementDirectionSet.X != 0 || movementDirectionSet.Y != 0)) {
         startDash();
     }
 
@@ -155,6 +201,10 @@ void Player::handleInput(const bool* keyState, GameState& gs) {
     if (keyState[SDL_SCANCODE_K]) {
         attack(gs);
     }
+}
+
+void Player::handleMovement(const bool* keyState, GameState &gs) {
+
 }
 
 void Player::startDash() {

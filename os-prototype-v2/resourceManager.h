@@ -13,6 +13,9 @@ private:
     std::unordered_map<std::string, std::vector<Animation>> animationSets;
 
 public:
+
+    ResourceManager() : renderer(renderer){}
+
     ResourceManager(SDL_Renderer* renderer) : renderer(renderer) {}
 
     ~ResourceManager() { unloadAll(); }
@@ -50,7 +53,7 @@ public:
         loadTexture("player_idle", "assets/player_assets/Idle.png");
         loadTexture("player_roll", "assets/player_assets/Rolling.png");
 
-        // Tiles
+        // Tiles    
         loadTexture("tile_dirt", "assets/map_assets/tile_003.png");
         loadTexture("tile_grass", "assets/map_assets/tile_040.png");
         loadTexture("tile_pillar", "assets/map_assets/tile_059.png");
@@ -60,11 +63,18 @@ public:
         loadTexture("fireball_impact", "assets/projectile_assets/fireball_impact_100x100.png");
 
         // Create animation sets
-        std::vector<Animation> playerAnims = {
-            Animation(15, 1.2f),  // RUN
-            Animation(15, 1.2f),  // IDLE
-            Animation(15, 1.2f)   // ROLL
-        };
+  
+        const int ANIM_PLAYER_RUN = 0;
+        const int ANIM_PLAYER_IDLE = 1;
+        const int ANIM_PLAYER_ROLL = 2;
+
+        std::vector<Animation> playerAnims;
+        playerAnims.resize(5);
+
+        playerAnims[ANIM_PLAYER_RUN] = Animation(15, 0.9f);
+        playerAnims[ANIM_PLAYER_IDLE] = Animation(15, 0.9f);
+        playerAnims[ANIM_PLAYER_ROLL] = Animation(15, 0.9f);
+
         createAnimationSet("player", playerAnims);
     }
 

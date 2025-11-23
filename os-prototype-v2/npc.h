@@ -27,4 +27,4 @@ public:
     NPCType getNPCType() const;
     void setTarget(Entity* newTarget);
     Entity* getTarget() const;
-};
+};  
