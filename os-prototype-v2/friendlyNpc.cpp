@@ -15,7 +15,7 @@ FriendlyNPC::FriendlyNPC()
 
 void FriendlyNPC::update(float deltaTime, GameState& gs) {
     // Physics
-    applyMovement(deltaTime);
+    applyMovement(deltaTime, maxSpeedX, maxSpeedY);
 
     // Timer logic for chat API would go here
 }

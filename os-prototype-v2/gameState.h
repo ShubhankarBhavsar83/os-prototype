@@ -7,10 +7,15 @@
 #include "Player.h"
 #include "ResourceManager.h"
 
+// Updated Layer Order for correct depth sorting
 const size_t LAYER_IDX_LEVEL = 0;
 const size_t LAYER_IDX_FURNITURE_BACKGROUND = 1;
-const size_t LAYER_IDX_CHARACTERS = 2;
-const size_t LAYER_IDX_FURNITURE_FOREGROUND = 3;
+const size_t LAYER_IDX_PORTAL_BACKGROUND = 2; // NEW: Behind Player
+const size_t LAYER_IDX_CHARACTERS = 3;
+const size_t LAYER_IDX_PORTAL_FOREGROUND = 4; // NEW: In front of Player
+const size_t LAYER_IDX_FURNITURE_FOREGROUND = 5;
+
+const size_t TOTAL_LAYERS = 6; // Updated Count
 
 enum class GameStateMode {
     PLAYING,
@@ -21,7 +26,8 @@ enum class GameStateMode {
 class GameState {
 private:
     GameStateMode mode;
-    std::array<std::vector<std::unique_ptr<Entity>>, 4> layers;
+    // Update array size to TOTAL_LAYERS (6)
+    std::array<std::vector<std::unique_ptr<Entity>>, TOTAL_LAYERS> layers;
     std::unique_ptr<ResourceManager> resourceManager;
     SDL_FRect mapViewport;
     Player* playerPtr;
@@ -46,5 +52,5 @@ public:
     void setMode(GameStateMode newMode) { mode = newMode; }
 
     void updateCamera();
-    void loadTestLevel();
+    void loadLevel();
 };

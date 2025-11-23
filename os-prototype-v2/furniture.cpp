@@ -13,10 +13,10 @@ void Furniture::updateLayer(const glm::vec2& playerPos, GameState& gs) {
     size_t newLayer;
 
     if (position.y > playerPos.y) {
-        newLayer = 3; // LAYER_IDX_FURNITURE_FOREGROUND
+        newLayer = LAYER_IDX_FURNITURE_FOREGROUND; // LAYER_IDX_FURNITURE_FOREGROUND
     }
     else {
-        newLayer = 1; // LAYER_IDX_FURNITURE_BACKGROUND
+        newLayer = LAYER_IDX_FURNITURE_BACKGROUND; // LAYER_IDX_FURNITURE_BACKGROUND
     }
 
     if (currentLayer != newLayer) {

@@ -13,7 +13,7 @@ protected:
 public:
     Movable()
         : Entity(), maxSpeedX(75.0f), maxSpeedY(75.0f),
-        directionHorizontal(0), directionVertical(0) {
+        directionHorizontal(0), directionVertical(0), friction(0) {
     }
 
     virtual ~Movable() = default;

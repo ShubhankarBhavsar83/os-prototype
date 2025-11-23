@@ -4,8 +4,8 @@
 #include "CoordinateSystem.h"
 #include <iostream>
 #include "LevelLoader.h" 
-const int MAP_ROWS = 25;
-const int MAP_COLS = 25;
+int MAP_ROWS = 25;
+int MAP_COLS = 25;
 const int TILE_SIZE = 32;
 
 GameState::GameState(SDL_Renderer* renderer, int viewportWidth, int viewportHeight)
@@ -56,18 +56,16 @@ void GameState::render(SDL_Renderer* renderer) {
         }
     }
 
-   /* SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-    for (auto& layer : layers) {
-        for (auto& entity : layer) {
-            if (entity && entity->isActive() && entity->isSolid()) {
-                SDL_FRect box = entity->getBoundingBox();
-
-                box.x -= mapViewport.x;
-                box.y -= mapViewport.y;
-
-                SDL_RenderRect(renderer, &box);
-            }
-        }*/
+    //SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+    //for (auto& layer : layers) {
+    //    for (auto& entity : layer) {
+    //        if (entity && entity->isActive() && entity->isSolid()) {
+    //            SDL_FRect box = entity->getBoundingBox();
+    //            box.x -= mapViewport.x;
+    //            box.y -= mapViewport.y;
+    //            SDL_RenderRect(renderer, &box);
+    //        }
+    //    }
     //}
 
 }
@@ -133,7 +131,7 @@ void GameState::updateCamera() {
     mapViewport.y = playerPos.y - mapViewport.h / 2.0f;
 }
 
-void GameState::loadTestLevel() {
+void GameState::loadLevel() {
     LevelLoader loader;
 
     // Load "abyss" or "corrode" or whatever your level name is

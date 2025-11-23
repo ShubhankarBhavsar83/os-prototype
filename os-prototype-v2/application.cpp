@@ -47,7 +47,7 @@ bool Application::initialize() {
 
     // Create game state
     gameState = std::make_unique<GameState>(renderer, logicalWidth, logicalHeight);
-    gameState->loadTestLevel();
+    gameState->loadLevel();
 
     running = true;
     previousTime = SDL_GetTicks();

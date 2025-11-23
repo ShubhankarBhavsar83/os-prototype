@@ -14,7 +14,7 @@ private:
 
     // Dash system
     float dashSpeed;
-    float dashDuration;
+    uint64_t dashDuration;
     float dashDurationMax;
     float dashCooldown;
     uint64_t dashCooldownMark;

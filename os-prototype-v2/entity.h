@@ -12,7 +12,8 @@ enum class EntityType {
     FRIENDLY_NPC,
     PROJECTILE,
     FURNITURE,
-    LEVEL_TILE
+    LEVEL_TILE,
+    PORTAL
 };
 
 class GameState; // Forward declaration

@@ -6,6 +6,7 @@
 #include "EnemyNpc.h"     
 #include "FriendlyNpc.h"  
 #include "CoordinateSystem.h"
+#include "Portal.h"        
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -26,6 +27,7 @@ LevelData LevelLoader::loadLevel(const std::string& levelName) {
     data.furnitureLayer = parseCSVGrid(basePath + "_furniture.csv");
     data.enemyLayer = parseCSVGrid(basePath + "_enemy.csv");
     data.npcLayer = parseCSVGrid(basePath + "_npcs.csv");
+    data.portalLayer = parseCSVGrid(basePath + "_portal.csv"); // Loading single portal layer
 
     // Set dimensions from terrain layer
     if (!data.terrainLayer.empty()) {
@@ -44,7 +46,8 @@ std::vector<std::vector<int>> LevelLoader::parseCSVGrid(const std::string& filep
     std::ifstream file(filepath);
 
     if (!file.is_open()) {
-        std::cout << "[LevelLoader] Warning: Could not open " << filepath << std::endl;
+        // Warn but don't crash (Portals might be optional)
+        std::cout << "[LevelLoader] Note: File not found: " << filepath << std::endl;
         return grid;
     }
 
@@ -54,16 +57,11 @@ std::vector<std::vector<int>> LevelLoader::parseCSVGrid(const std::string& filep
     while (std::getline(file, line)) {
         // BOM FIX
         if (firstLine) {
-            if (line.size() >= 3 && (unsigned char)line[0] == 0xEF && (unsigned char)line[1] == 0xBB && (unsigned char)line[2] == 0xBF) {
-                line = line.substr(3);
-            }
+            if (line.size() >= 3 && (unsigned char)line[0] == 0xEF) line = line.substr(3);
             firstLine = false;
         }
-
         // Cleanup
-        while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' ')) {
-            line.pop_back();
-        }
+        while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) line.pop_back();
 
         std::vector<int> row;
         std::stringstream ss(line);
@@ -76,13 +74,9 @@ std::vector<std::vector<int>> LevelLoader::parseCSVGrid(const std::string& filep
                     if (!cell.empty()) row.push_back(std::stoi(cell));
                     else row.push_back(0);
                 }
-                else {
-                    row.push_back(0);
-                }
+                else row.push_back(0);
             }
-            catch (...) {
-                row.push_back(0);
-            }
+            catch (...) { row.push_back(0); }
         }
         if (!row.empty()) grid.push_back(row);
     }
@@ -160,7 +154,7 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
         }
     }
 
-    // 4. ENEMY (Wrapped in try-catch to identify crashes)
+    // 4. ENEMY
     if (!data.enemyLayer.empty()) {
         for (int r = 0; r < data.height; ++r) {
             for (int c = 0; c < data.width; ++c) {
@@ -170,19 +164,18 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
 
                 try {
                     glm::vec2 pos = CoordinateSystem::orthoToIso(c, r, TILE_SIZE, logicalW, logicalH);
-                    // !!! If this crashes, check EnemyNPC constructor !!!
                     auto enemy = std::make_unique<EnemyNPC>(EnemyAIType::MELEE);
                     enemy->setPosition(pos);
                     gs.addEntity(std::move(enemy), LAYER_IDX_CHARACTERS);
                 }
                 catch (...) {
-                    std::cerr << "[LevelLoader] CRASH prevented while spawning Enemy at " << c << "," << r << std::endl;
+                    std::cerr << "[LevelLoader] Error spawning Enemy at " << c << "," << r << std::endl;
                 }
             }
         }
     }
 
-    // 5. NPC (Wrapped in try-catch)
+    // 5. NPC
     if (!data.npcLayer.empty()) {
         for (int r = 0; r < data.height; ++r) {
             for (int c = 0; c < data.width; ++c) {
@@ -192,14 +185,39 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
 
                 try {
                     glm::vec2 pos = CoordinateSystem::orthoToIso(c, r, TILE_SIZE, logicalW, logicalH);
-                    // !!! If this crashes, check FriendlyNPC constructor !!!
                     auto npc = std::make_unique<FriendlyNPC>();
                     npc->setPosition(pos);
                     gs.addEntity(std::move(npc), LAYER_IDX_CHARACTERS);
                 }
                 catch (...) {
-                    std::cerr << "[LevelLoader] CRASH prevented while spawning NPC at " << c << "," << r << std::endl;
+                    std::cerr << "[LevelLoader] Error spawning NPC at " << c << "," << r << std::endl;
                 }
+            }
+        }
+    }
+
+    // 6. PORTAL (Fixed Texture Loading)
+    if (!data.portalLayer.empty()) {
+        for (int r = 0; r < data.height; ++r) {
+            for (int c = 0; c < data.width; ++c) {
+                if (r >= (int)data.portalLayer.size() || c >= (int)data.portalLayer[r].size()) continue;
+                int id = data.portalLayer[r][c];
+                if (id <= 0) continue;
+
+                // --- START FIX: Load Texture ---
+                std::string texKey = "tile_" + std::to_string(id);
+                if (!res.getTexture(texKey)) {
+                    // Loads the image, e.g., "assets/map_assets/tile_150.png"
+                    res.loadTexture(texKey, "assets/map_assets/tile_" + formatTileID(id) + ".png");
+                }
+                // -------------------------------
+
+                auto portal = std::make_unique<Portal>();
+                portal->texture = res.getTexture(texKey); // Assign the texture!
+                portal->setPosition(CoordinateSystem::orthoToIso(c, r, TILE_SIZE, logicalW, logicalH));
+
+                // Using BACKGROUND layer as per your GameState setup
+                gs.addEntity(std::move(portal), LAYER_IDX_PORTAL_BACKGROUND);
             }
         }
     }

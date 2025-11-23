@@ -14,6 +14,9 @@ EnemyNPC::EnemyNPC(EnemyAIType type)
     this->spriteWidth = 32.0f;
     this->spriteHeight = 32.0f;
     this->friction = 500.0f; // Slidier than player
+    this->maxSpeedX = 35.0f;
+    this->maxSpeedY = 35.0f;
+
 
     // Initialize patrol points with at least current position to prevent crashes
     patrolPoints.push_back(glm::vec2(0, 0));
@@ -31,7 +34,7 @@ void EnemyNPC::update(float deltaTime, GameState& gs) {
     updateAI(deltaTime, gs);
 
     // 3. Apply Physics (from Movable)
-    applyMovement(deltaTime);
+    applyMovement(deltaTime, maxSpeedX, maxSpeedY);
 }
 
 void EnemyNPC::updateAI(float deltaTime, GameState& gs) {
