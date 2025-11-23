@@ -3,7 +3,7 @@
 #include "Furniture.h"
 #include "CoordinateSystem.h"
 #include <iostream>
-
+#include "LevelLoader.h" 
 const int MAP_ROWS = 25;
 const int MAP_COLS = 25;
 const int TILE_SIZE = 32;
@@ -134,99 +134,19 @@ void GameState::updateCamera() {
 }
 
 void GameState::loadTestLevel() {
-    short terrain_map[MAP_ROWS][MAP_COLS] = {
-        {1,1,1,1,1,2,2,2,2,2,1,1,1,1,1,2,2,2,2,2,1,1,1,1,1},
-        {1,1,1,1,2,2,2,1,1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,1,2},
-        {1,1,1,2,2,2,2,1,1,1,1,1,1,2,2,2,2,1,1,1,1,1,1,2,2},
-        {1,1,2,2,2,2,2,1,1,1,1,2,2,2,2,2,2,1,1,1,1,2,2,2,2},
-        {1,1,1,1,1,2,2,2,2,1,1,1,1,1,2,2,2,2,1,1,1,1,1,2,2},
-        {1,1,1,1,2,2,2,2,2,2,1,1,1,1,2,2,2,2,2,2,1,1,1,2,2},
-        {1,1,1,1,1,2,2,1,2,2,1,1,1,1,1,2,2,1,2,2,1,1,1,1,2},
-        {1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,2},
-        {1,1,1,1,1,2,2,2,1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,2,2},
-        {1,1,1,2,2,2,1,1,1,2,1,1,1,2,2,2,1,1,1,2,1,1,2,2,2},
-        {1,1,1,1,1,2,2,2,2,2,1,1,1,1,1,2,2,2,2,2,1,1,1,1,1},
-        {1,1,1,1,2,2,2,1,1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,1,2},
-        {1,1,1,2,2,2,2,1,1,1,1,1,1,2,2,2,2,1,1,1,1,1,1,2,2},
-        {1,1,2,2,2,2,2,1,1,1,1,2,2,2,2,2,2,1,1,1,1,2,2,2,2},
-        {1,1,1,1,1,2,2,2,2,1,1,1,1,1,2,2,2,2,1,1,1,1,1,2,2},
-        {1,1,1,1,2,2,2,2,2,2,1,1,1,1,2,2,2,2,2,2,1,1,1,2,2},
-        {1,1,1,1,1,2,2,1,2,2,1,1,1,1,1,2,2,1,2,2,1,1,1,1,2},
-        {1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,2},
-        {1,1,1,1,1,2,2,2,1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,2,2},
-        {1,1,1,2,2,2,1,1,1,2,1,1,1,2,2,2,1,1,1,2,1,1,2,2,2},
-        {1,1,1,1,1,2,2,2,2,2,1,1,1,1,1,2,2,2,2,2,1,1,1,1,1},
-        {1,1,1,1,2,2,2,1,1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,1,2},
-        {1,1,1,2,2,2,2,1,1,1,1,1,1,2,2,2,2,1,1,1,1,1,1,2,2},
-        {1,1,2,2,2,2,2,1,1,1,1,2,2,2,2,2,2,1,1,1,1,2,2,2,2},
-        {1,1,1,1,1,2,2,2,2,1,1,1,1,1,2,2,2,2,1,1,1,1,1,2,2}
-    };
+    LevelLoader loader;
 
-    short furniture_map[MAP_ROWS][MAP_COLS] = {
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-    };
+    // Load "abyss" or "corrode" or whatever your level name is
+    // This will look for assets/levels/abyss_terrain.csv, etc.
+    LevelData data = loader.loadLevel("abyss");
 
-    // Create tiles
-    for (int r = 0; r < MAP_ROWS; r++) {
-        for (int c = 0; c < MAP_COLS; c++) {
-            glm::vec2 isoPos = CoordinateSystem::orthoToIso(c, r, TILE_SIZE, logicalWidth, logicalHeight);
-
-            // Terrain
-            if (terrain_map[r][c] == 1) {
-                auto tile = std::make_unique<LevelTile>(TileType::FLOOR_DIRT);
-                tile->setPosition(isoPos);
-                tile->texture = resourceManager->getTexture("tile_dirt");
-                addEntity(std::move(tile), LAYER_IDX_LEVEL);
-            }
-            else if (terrain_map[r][c] == 2) {
-                auto tile = std::make_unique<LevelTile>(TileType::FLOOR_GRASS);
-                tile->setPosition(isoPos);
-                tile->texture = resourceManager->getTexture("tile_grass");
-                addEntity(std::move(tile), LAYER_IDX_LEVEL);
-            }
-
-            // Furniture
-            if (furniture_map[r][c] == 5) {
-                auto furn = std::make_unique<Furniture>();
-                furn->setPosition(isoPos);
-                furn->texture = resourceManager->getTexture("tile_pillar");
-                int test = 300 + (r * MAP_COLS + c);
-                furn->setId(test);
-                addEntity(std::move(furn), LAYER_IDX_FURNITURE_BACKGROUND);
-            }
-        }
+    // This function needs access to your ResourceManager.
+    // Ensure your ResourceManager getter in GameState.h is public.
+    if (resourceManager) {
+        // Note: You might need to update populateGameState signature 
+        // to take logicalWidth/Height if they aren't accessible globally or via GameState
+        loader.populateGameState(data, *this, *resourceManager);
     }
 
-    // Create player at position (0, 0)
-    glm::vec2 playerPos = CoordinateSystem::orthoToIso(3, 3, TILE_SIZE, logicalWidth, logicalHeight);
-    auto player = std::make_unique<Player>();
-    player->setPosition(playerPos);
-    player->texture = resourceManager->getTexture("player_idle");
-    player->animations = resourceManager->getAnimationSet("player");
-    player->playAnimation(1); // IDLE animation
-    addEntity(std::move(player), LAYER_IDX_CHARACTERS);
+    std::cout << "Level Loaded with Dimensions: " << data.width << "x" << data.height << std::endl;
 }
