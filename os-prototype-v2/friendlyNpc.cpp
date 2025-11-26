@@ -30,11 +30,11 @@ void FriendlyNPC::render(SDL_Renderer* renderer, const SDL_FRect& viewport) {
     // Green rectangle fallback
     if (!texture) {
         SDL_SetRenderDrawColor(renderer, 50, 200, 50, 255);
-        SDL_FRect dst = { position.x - viewport.x, position.y - viewport.y, spriteWidth, spriteHeight };
+        SDL_FRect dst = { position.x - viewport.x, position.y - viewport.y, spriteWidth * scale, spriteHeight * scale };
         SDL_RenderFillRect(renderer, &dst);
     }
     else {
-        SDL_FRect dst = { position.x - viewport.x, position.y - viewport.y, spriteWidth, spriteHeight };
+        SDL_FRect dst = { position.x - viewport.x, position.y - viewport.y, spriteWidth * scale, spriteHeight * scale };
         SDL_RenderTexture(renderer, texture, nullptr, &dst);
     }
 

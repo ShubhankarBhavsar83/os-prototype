@@ -34,7 +34,7 @@ protected:
 
     float spriteWidth;
     float spriteHeight;
-    float scale;
+    
     bool solid;
     bool active;
     Collider collider;
@@ -43,7 +43,7 @@ protected:
     int verticalSpriteIndex;
 
 public:
-
+    float scale;
     SDL_Texture* texture;
     std::vector<Animation> animations;
 
@@ -76,8 +76,8 @@ public:
     virtual size_t getCurrentLayer() const { return currentLayer; }
 
     // Setters
-    virtual void setId(int &entityId) {  id = entityId; }
-    virtual void setTexture(SDL_Texture &tex) const { *texture = tex; }
+    virtual void setId(int& entityId) { id = entityId; }
+    virtual void setTexture(SDL_Texture& tex) const { *texture = tex; }
     virtual void setAnimations(std::vector<Animation> ani) { animations = ani; }
 
     virtual void setPosition(const glm::vec2& pos) { position = pos; }

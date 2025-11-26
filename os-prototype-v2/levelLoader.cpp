@@ -14,6 +14,44 @@
 #include <algorithm>
 
 LevelLoader::LevelLoader() {}
+std::vector<std::vector<float>> LevelLoader::parseCSVGridFloat(const std::string& filepath) {
+    std::vector<std::vector<float>> grid;
+    std::ifstream file(filepath);
+
+    if (!file.is_open()) {
+        std::cout << "[LevelLoader] Note: Scale file not found: " << filepath << " (Using default 1.0)" << std::endl;
+        return grid;
+    }
+
+    std::string line;
+    bool firstLine = true;
+
+    while (std::getline(file, line)) {
+        if (firstLine) {
+            if (line.size() >= 3 && (unsigned char)line[0] == 0xEF) line = line.substr(3);
+            firstLine = false;
+        }
+        while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) line.pop_back();
+
+        std::vector<float> row;
+        std::stringstream ss(line);
+        std::string cell;
+
+        while (std::getline(ss, cell, ',')) {
+            try {
+                if (!cell.empty()) {
+                    cell.erase(std::remove(cell.begin(), cell.end(), ' '), cell.end());
+                    if (!cell.empty()) row.push_back(std::stof(cell));
+                    else row.push_back(1.0f);
+                }
+                else row.push_back(1.0f);
+            }
+            catch (...) { row.push_back(1.0f); }
+        }
+        if (!row.empty()) grid.push_back(row);
+    }
+    return grid;
+}
 
 LevelData LevelLoader::loadLevel(const std::string& levelName) {
     LevelData data;
@@ -28,6 +66,13 @@ LevelData LevelLoader::loadLevel(const std::string& levelName) {
     data.enemyLayer = parseCSVGrid(basePath + "_enemy.csv");
     data.npcLayer = parseCSVGrid(basePath + "_npcs.csv");
     data.portalLayer = parseCSVGrid(basePath + "_portal.csv"); // Loading single portal layer
+    // Load Scale layers
+    data.terrainScale = parseCSVGridFloat(basePath + "_terrain_scale.csv");
+    data.playerScale = parseCSVGridFloat(basePath + "_player_scale.csv");
+    data.furnitureScale = parseCSVGridFloat(basePath + "_furniture_scale.csv");
+    data.enemyScale = parseCSVGridFloat(basePath + "_enemy_scale.csv");
+    data.npcScale = parseCSVGridFloat(basePath + "_npcs_scale.csv");
+    data.portalScale = parseCSVGridFloat(basePath + "_portal_scale.csv");
 
     // Set dimensions from terrain layer
     if (!data.terrainLayer.empty()) {
@@ -89,6 +134,14 @@ std::string formatTileID(int id) {
     ss << std::setw(3) << std::setfill('0') << id;
     return ss.str();
 }
+// Helper to safely get scale value
+float getScaleAt(const std::vector<std::vector<float>>& scaleGrid, int r, int c) {
+    if (r >= 0 && r < (int)scaleGrid.size() &&
+        c >= 0 && c < (int)scaleGrid[r].size()) {
+        return scaleGrid[r][c];
+    }
+    return 1.0f; // Default scale
+}
 
 void LevelLoader::populateGameState(const LevelData& data, GameState& gs, ResourceManager& res) {
     int logicalW = 640;
@@ -97,7 +150,7 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
 
     std::cout << "[LevelLoader] Populating Game State..." << std::endl;
 
-    // 1. TERRAIN
+    // 1. TERRAIN (with scale)
     for (int r = 0; r < data.height; ++r) {
         for (int c = 0; c < data.width; ++c) {
             if (r >= (int)data.terrainLayer.size() || c >= (int)data.terrainLayer[r].size()) continue;
@@ -112,11 +165,12 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
             auto tile = std::make_unique<LevelTile>(TileType::FLOOR_DIRT);
             tile->texture = res.getTexture(texKey);
             tile->setPosition(CoordinateSystem::orthoToIso(c, r, TILE_SIZE, logicalW, logicalH));
+            tile->scale = getScaleAt(data.terrainScale, r, c); // Apply scale
             gs.addEntity(std::move(tile), LAYER_IDX_LEVEL);
         }
     }
 
-    // 2. FURNITURE
+    // 2. FURNITURE (with scale)
     if (!data.furnitureLayer.empty()) {
         for (int r = 0; r < data.height; ++r) {
             for (int c = 0; c < data.width; ++c) {
@@ -130,12 +184,13 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
                 auto furn = std::make_unique<Furniture>();
                 furn->texture = res.getTexture(texKey);
                 furn->setPosition(CoordinateSystem::orthoToIso(c, r, TILE_SIZE, logicalW, logicalH));
+                furn->scale = getScaleAt(data.furnitureScale, r, c); // Apply scale
                 gs.addEntity(std::move(furn), LAYER_IDX_FURNITURE_BACKGROUND);
             }
         }
     }
 
-    // 3. PLAYER
+    // 3. PLAYER (scale doesn't typically apply, but keeping structure)
     if (!data.playerLayer.empty()) {
         for (int r = 0; r < data.height; ++r) {
             for (int c = 0; c < data.width; ++c) {
@@ -148,13 +203,15 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
                     player->texture = res.getTexture("player_idle");
                     player->animations = res.getAnimationSet("player");
                     player->playAnimation(1);
+                    // Player scale is set in Player constructor, but you could override:
+                    // player->scale = getScaleAt(data.playerScale, r, c);
                     gs.addEntity(std::move(player), LAYER_IDX_CHARACTERS);
                 }
             }
         }
     }
 
-    // 4. ENEMY
+    // 4. ENEMY (with scale)
     if (!data.enemyLayer.empty()) {
         for (int r = 0; r < data.height; ++r) {
             for (int c = 0; c < data.width; ++c) {
@@ -166,6 +223,7 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
                     glm::vec2 pos = CoordinateSystem::orthoToIso(c, r, TILE_SIZE, logicalW, logicalH);
                     auto enemy = std::make_unique<EnemyNPC>(EnemyAIType::MELEE);
                     enemy->setPosition(pos);
+                    enemy->scale = getScaleAt(data.enemyScale, r, c); // Apply scale
                     gs.addEntity(std::move(enemy), LAYER_IDX_CHARACTERS);
                 }
                 catch (...) {
@@ -175,7 +233,7 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
         }
     }
 
-    // 5. NPC
+    // 5. NPC (with scale)
     if (!data.npcLayer.empty()) {
         for (int r = 0; r < data.height; ++r) {
             for (int c = 0; c < data.width; ++c) {
@@ -187,6 +245,7 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
                     glm::vec2 pos = CoordinateSystem::orthoToIso(c, r, TILE_SIZE, logicalW, logicalH);
                     auto npc = std::make_unique<FriendlyNPC>();
                     npc->setPosition(pos);
+                    npc->scale = getScaleAt(data.npcScale, r, c); // Apply scale
                     gs.addEntity(std::move(npc), LAYER_IDX_CHARACTERS);
                 }
                 catch (...) {
@@ -196,7 +255,7 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
         }
     }
 
-    // 6. PORTAL (Fixed Texture Loading)
+    // 6. PORTAL (with scale)
     if (!data.portalLayer.empty()) {
         for (int r = 0; r < data.height; ++r) {
             for (int c = 0; c < data.width; ++c) {
@@ -204,19 +263,15 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
                 int id = data.portalLayer[r][c];
                 if (id <= 0) continue;
 
-                // --- START FIX: Load Texture ---
                 std::string texKey = "tile_" + std::to_string(id);
                 if (!res.getTexture(texKey)) {
-                    // Loads the image, e.g., "assets/map_assets/tile_150.png"
                     res.loadTexture(texKey, "assets/map_assets/tile_" + formatTileID(id) + ".png");
                 }
-                // -------------------------------
 
                 auto portal = std::make_unique<Portal>();
-                portal->texture = res.getTexture(texKey); // Assign the texture!
+                portal->texture = res.getTexture(texKey);
                 portal->setPosition(CoordinateSystem::orthoToIso(c, r, TILE_SIZE, logicalW, logicalH));
-
-                // Using BACKGROUND layer as per your GameState setup
+                portal->scale = getScaleAt(data.portalScale, r, c); // Apply scale
                 gs.addEntity(std::move(portal), LAYER_IDX_PORTAL_BACKGROUND);
             }
         }
