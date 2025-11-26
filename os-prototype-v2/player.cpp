@@ -31,7 +31,8 @@ Player::Player()
     maxSpeedX = 50.0f;
     maxSpeedY = 50.0f;
 
-    collider = Collider(49.0f * scale, 45.0f * scale, 39.0f * scale, 39.0f * scale);
+    collider = Collider(49.0f * scale, 45.0f * scale, 39.0f * scale, 39.0f * scale, true);
+
 }
 
 void Player::update(float deltaTime, GameState& gs) {

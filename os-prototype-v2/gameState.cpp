@@ -31,9 +31,9 @@ GameState::GameState(SDL_Renderer* renderer, int viewportWidth, int viewportHeig
     uiManager = std::make_unique<UIManager>(renderer);
 
     // Setup UI ability icons
-    uiManager->addAbilityIcon("Dash", "assets/ui/dash_icon.png", 5.0f);
+   /* uiManager->addAbilityIcon("Dash", "assets/ui/dash_icon.png", 5.0f);
     uiManager->addAbilityIcon("Melee", "assets/ui/melee_icon.png", 0.6f);
-    uiManager->addAbilityIcon("Fireball", "assets/ui/fireball_icon.png", 2.0f);
+    uiManager->addAbilityIcon("Fireball", "assets/ui/fireball_icon.png", 2.0f);*/
 }
 
 void GameState::update(float deltaTime) {
@@ -78,7 +78,19 @@ void GameState::render(SDL_Renderer* renderer) {
             }
         }
     }
-
+    
+    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+    for (auto& layer : layers) {
+        for (auto& entity : layer) {
+            if (entity && entity->isActive() && entity->isSolid()) {
+                SDL_FRect box = entity->getBoundingBox();
+                box.x -= mapViewport.x;
+                box.y -= mapViewport.y;
+                SDL_RenderRect(renderer, &box);
+            }
+        }
+    }
+    
     // Render UI on top
     uiManager->render(*this);
 }

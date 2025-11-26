@@ -5,12 +5,12 @@ class Furniture : public Entity {
 public:
     Furniture() : Entity() {
         type = EntityType::FURNITURE;
-        solid = true;
+        solid = false;
         spriteWidth = 32.0f;
         spriteHeight = 32.0f;
         scale = 1.0f;
 
-        collider = Collider(6.0f, 7.0f, 3.0f, 2.0f);
+        collider = Collider(6.0f, 7.0f, 3.0f, 2.0f, false);
     }
 
     void update(float deltaTime, GameState& gs) override;

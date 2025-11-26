@@ -12,8 +12,21 @@
 #include <iostream>
 #include <iomanip>
 #include <algorithm>
+#include <map>
+
+// Global collision data storage
+struct TileColliderData {
+    bool isSolid = false;
+    int offsetLeft = 0;
+    int offsetRight = 0;
+    int offsetTop = 0;
+    int offsetBottom = 0;
+};
+
+static std::map<int, TileColliderData> gTileColliders;
 
 LevelLoader::LevelLoader() {}
+
 std::vector<std::vector<float>> LevelLoader::parseCSVGridFloat(const std::string& filepath) {
     std::vector<std::vector<float>> grid;
     std::ifstream file(filepath);
@@ -65,7 +78,8 @@ LevelData LevelLoader::loadLevel(const std::string& levelName) {
     data.furnitureLayer = parseCSVGrid(basePath + "_furniture.csv");
     data.enemyLayer = parseCSVGrid(basePath + "_enemy.csv");
     data.npcLayer = parseCSVGrid(basePath + "_npcs.csv");
-    data.portalLayer = parseCSVGrid(basePath + "_portal.csv"); // Loading single portal layer
+    data.portalLayer = parseCSVGrid(basePath + "_portal.csv");
+
     // Load Scale layers
     data.terrainScale = parseCSVGridFloat(basePath + "_terrain_scale.csv");
     data.playerScale = parseCSVGridFloat(basePath + "_player_scale.csv");
@@ -91,7 +105,6 @@ std::vector<std::vector<int>> LevelLoader::parseCSVGrid(const std::string& filep
     std::ifstream file(filepath);
 
     if (!file.is_open()) {
-        // Warn but don't crash (Portals might be optional)
         std::cout << "[LevelLoader] Note: File not found: " << filepath << std::endl;
         return grid;
     }
@@ -100,12 +113,10 @@ std::vector<std::vector<int>> LevelLoader::parseCSVGrid(const std::string& filep
     bool firstLine = true;
 
     while (std::getline(file, line)) {
-        // BOM FIX
         if (firstLine) {
             if (line.size() >= 3 && (unsigned char)line[0] == 0xEF) line = line.substr(3);
             firstLine = false;
         }
-        // Cleanup
         while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) line.pop_back();
 
         std::vector<int> row;
@@ -128,19 +139,88 @@ std::vector<std::vector<int>> LevelLoader::parseCSVGrid(const std::string& filep
     return grid;
 }
 
-// Helper
 std::string formatTileID(int id) {
     std::stringstream ss;
     ss << std::setw(3) << std::setfill('0') << id;
     return ss.str();
 }
-// Helper to safely get scale value
+
 float getScaleAt(const std::vector<std::vector<float>>& scaleGrid, int r, int c) {
     if (r >= 0 && r < (int)scaleGrid.size() &&
         c >= 0 && c < (int)scaleGrid[r].size()) {
         return scaleGrid[r][c];
     }
-    return 1.0f; // Default scale
+    return 1.0f;
+}
+
+// NEW: Load collision data from CSV
+void LevelLoader::loadTileCollisionData() {
+    std::string colliderFile = "assets/levels/tile_colliders.csv";
+    std::ifstream file(colliderFile);
+
+    if (!file.is_open()) {
+        std::cout << "[LevelLoader] Warning: tile_colliders.csv not found. No collision data loaded." << std::endl;
+        return;
+    }
+
+    std::string line;
+    std::getline(file, line); // Skip header
+
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+
+        // Remove trailing whitespace
+        while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) {
+            line.pop_back();
+        }
+
+        std::stringstream ss(line);
+        std::string token;
+        std::vector<std::string> tokens;
+
+        while (std::getline(ss, token, ',')) {
+            tokens.push_back(token);
+        }
+
+        if (tokens.size() >= 6) {
+            try {
+                int tileID = std::stoi(tokens[0]) - 1; // Convert from 1-based to 0-based
+                TileColliderData collider;
+                collider.isSolid = (std::stoi(tokens[1]) == 1);
+                collider.offsetLeft = std::stoi(tokens[2]);
+                collider.offsetRight = std::stoi(tokens[3]);
+                collider.offsetTop = std::stoi(tokens[4]);
+                collider.offsetBottom = std::stoi(tokens[5]);
+
+                gTileColliders[tileID] = collider;
+            }
+            catch (...) {
+                std::cerr << "[LevelLoader] Error parsing collision data for line: " << line << std::endl;
+            }
+        }
+    }
+
+    file.close();
+    std::cout << "[LevelLoader] Loaded " << gTileColliders.size() << " tile collision definitions." << std::endl;
+}
+
+// NEW: Get collider for a tile ID
+Collider LevelLoader::getColliderForTileID(int tileID, float baseWidth, float baseHeight, float scale) {
+    auto it = gTileColliders.find(tileID);
+
+    if (it != gTileColliders.end() && it->second.isSolid) {
+        const TileColliderData& data = it->second;
+        return Collider(
+            data.offsetLeft * scale,
+            data.offsetRight * scale,
+            data.offsetTop * scale,
+            data.offsetBottom * scale,
+            true  // isSolid = true
+        );
+    }
+
+    // Return non-solid collider for tiles without collision data
+    return Collider(0, 0, 0, 0, false);
 }
 
 void LevelLoader::populateGameState(const LevelData& data, GameState& gs, ResourceManager& res) {
@@ -148,9 +228,12 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
     int logicalH = 320;
     int TILE_SIZE = 32;
 
+    // NEW: Load collision data before populating
+    loadTileCollisionData();
+
     std::cout << "[LevelLoader] Populating Game State..." << std::endl;
 
-    // 1. TERRAIN (with scale)
+    // 1. TERRAIN (with scale AND collision)
     for (int r = 0; r < data.height; ++r) {
         for (int c = 0; c < data.width; ++c) {
             if (r >= (int)data.terrainLayer.size() || c >= (int)data.terrainLayer[r].size()) continue;
@@ -165,12 +248,16 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
             auto tile = std::make_unique<LevelTile>(TileType::FLOOR_DIRT);
             tile->texture = res.getTexture(texKey);
             tile->setPosition(CoordinateSystem::orthoToIso(c, r, TILE_SIZE, logicalW, logicalH));
-            tile->scale = getScaleAt(data.terrainScale, r, c); // Apply scale
+            tile->scale = getScaleAt(data.terrainScale, r, c);
+
+            // NEW: Apply collision data from CSV
+            tile->collider = getColliderForTileID(id, 32.0f, 32.0f, tile->scale);
+
             gs.addEntity(std::move(tile), LAYER_IDX_LEVEL);
         }
     }
 
-    // 2. FURNITURE (with scale)
+    // 2. FURNITURE (with scale AND collision)
     if (!data.furnitureLayer.empty()) {
         for (int r = 0; r < data.height; ++r) {
             for (int c = 0; c < data.width; ++c) {
@@ -184,7 +271,11 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
                 auto furn = std::make_unique<Furniture>();
                 furn->texture = res.getTexture(texKey);
                 furn->setPosition(CoordinateSystem::orthoToIso(c, r, TILE_SIZE, logicalW, logicalH));
-                furn->scale = getScaleAt(data.furnitureScale, r, c); // Apply scale
+                furn->scale = getScaleAt(data.furnitureScale, r, c);
+
+                // NEW: Apply collision data from CSV
+                furn->collider = getColliderForTileID(id, 32.0f, 32.0f, furn->scale);
+
                 gs.addEntity(std::move(furn), LAYER_IDX_FURNITURE_BACKGROUND);
             }
         }
@@ -203,8 +294,6 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
                     player->texture = res.getTexture("player_idle");
                     player->animations = res.getAnimationSet("player");
                     player->playAnimation(1);
-                    // Player scale is set in Player constructor, but you could override:
-                    // player->scale = getScaleAt(data.playerScale, r, c);
                     gs.addEntity(std::move(player), LAYER_IDX_CHARACTERS);
                 }
             }
@@ -223,7 +312,7 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
                     glm::vec2 pos = CoordinateSystem::orthoToIso(c, r, TILE_SIZE, logicalW, logicalH);
                     auto enemy = std::make_unique<EnemyNPC>(EnemyAIType::MELEE);
                     enemy->setPosition(pos);
-                    enemy->scale = getScaleAt(data.enemyScale, r, c); // Apply scale
+                    enemy->scale = getScaleAt(data.enemyScale, r, c);
                     gs.addEntity(std::move(enemy), LAYER_IDX_CHARACTERS);
                 }
                 catch (...) {
@@ -245,7 +334,7 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
                     glm::vec2 pos = CoordinateSystem::orthoToIso(c, r, TILE_SIZE, logicalW, logicalH);
                     auto npc = std::make_unique<FriendlyNPC>();
                     npc->setPosition(pos);
-                    npc->scale = getScaleAt(data.npcScale, r, c); // Apply scale
+                    npc->scale = getScaleAt(data.npcScale, r, c);
                     gs.addEntity(std::move(npc), LAYER_IDX_CHARACTERS);
                 }
                 catch (...) {
@@ -255,7 +344,7 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
         }
     }
 
-    // 6. PORTAL (with scale)
+    // 6. PORTAL (with scale AND collision)
     if (!data.portalLayer.empty()) {
         for (int r = 0; r < data.height; ++r) {
             for (int c = 0; c < data.width; ++c) {
@@ -271,7 +360,11 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
                 auto portal = std::make_unique<Portal>();
                 portal->texture = res.getTexture(texKey);
                 portal->setPosition(CoordinateSystem::orthoToIso(c, r, TILE_SIZE, logicalW, logicalH));
-                portal->scale = getScaleAt(data.portalScale, r, c); // Apply scale
+                portal->scale = getScaleAt(data.portalScale, r, c);
+
+                // NEW: Apply collision data from CSV
+                portal->collider = getColliderForTileID(id, 32.0f, 32.0f, portal->scale);
+
                 gs.addEntity(std::move(portal), LAYER_IDX_PORTAL_BACKGROUND);
             }
         }
