@@ -3,6 +3,7 @@
 #include <vector>
 #include <functional>
 #include <SDL3/SDL.h>
+#include <SDL3_ttf/SDL_ttf.h>
 
 struct ChatMessage {
     std::string sender;
@@ -26,7 +27,8 @@ private:
     std::function<void(const std::string&)> onMessageSent;
     bool waitingForResponse;
 
-    // Text rendering (you'll need SDL_ttf or similar)
+    // Text rendering
+    TTF_Font* font;
     SDL_Texture* fontTexture;
 
 public:
@@ -37,15 +39,16 @@ public:
     void deactivate();
     bool isActive() const;
 
+    void setPosition(float x, float y);
     void addMessage(const std::string& sender, const std::string& text);
     void handleTextInput(const std::string& text);
-    void handleKeyPress(SDL_Scancode key);
+    void handleKeyPress(SDL_Keycode key);
     void sendCurrentMessage();
-
     void setMessageCallback(std::function<void(const std::string&)> callback);
     void setWaitingForResponse(bool waiting);
-
     void render(SDL_Renderer* renderer);
-    void renderMessage(SDL_Renderer* renderer, const ChatMessage& msg, int yOffset);
+
+    // Helpers - updated signature to return height
+    float renderMessage(SDL_Renderer* renderer, const ChatMessage& msg, float yOffset);
     void renderInputBox(SDL_Renderer* renderer);
 };

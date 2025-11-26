@@ -1,66 +1,51 @@
 #pragma once
 #include "NPC.h"
+#include "ApiClient.h"
+#include "ChatSystem.h"
 #include <string>
-#include <queue>
-#include <functional>
-
-struct ChatMessage {
-    std::string sender; // "player" or "npc"
-    std::string text;
-    uint64_t timestamp;
-};
-
-// NEW: Interaction types for polymorphic behavior
-enum class InteractionType {
-    CHAT_API,  // Calls n8n API
-    QUEST_GIVE,
-    SHOP,
-    LORE
-};
+#include <SDL3_ttf/SDL_ttf.h>
 
 class FriendlyNPC : public NPC {
 private:
-    InteractionType interactionType;
-    std::string npcName;
-    std::string apiEndpoint; // e.g., "https://your-n8n-instance.com/webhook/chat"
-    std::string conversationContext;
-    std::queue<ChatMessage> chatHistory;
+    // Components
+    ChatSystem chatSystem;
 
-    bool chatActive;
-    Timer responseWaitTimer;
-    std::string pendingResponse;
-    bool waitingForAPI;
+    // API / Chat State
+    std::string n8nWebhookUrl = "http://localhost:5678/webhook/c5b211d5-458b-4d5e-b88e-d5676ab93601";
+    bool isWaitingForResponse;
+    std::string currentInput;
+    std::string lastResponse;
 
-    // Visual indicator
-    float interactPromptAlpha;
-    bool showInteractPrompt;
+    // Character Identity
+    std::string characterName;
+    std::string playerID;
+
+    // Rendering
+    TTF_Font* font;
 
 public:
-    FriendlyNPC(InteractionType type = InteractionType::CHAT_API,
-        const std::string& name = "Friendly NPC");
+    static FriendlyNPC* activeChatNPC;
+
+    FriendlyNPC();
+    ~FriendlyNPC();
 
     void update(float deltaTime, class GameState& gs) override;
     void render(SDL_Renderer* renderer, const SDL_FRect& viewport) override;
-    void handleCollision(Entity* other) override;
+    void handleCollision(Entity* other) override {}
     void onPlayerInteract(class Player* player) override;
 
-    // Chat system
+    // Chat & Input
     void startChat();
     void endChat();
-    void sendMessage(const std::string& message);
-    void receiveResponse(const std::string& response);
-    void renderChatUI(SDL_Renderer* renderer);
-    bool isChatActive() const;
+    void handleTextInput(const std::string& text);
+    void handleKeyDown(SDL_Keycode key);
 
-    // NEW: API integration (implement in .cpp with actual HTTP library)
-    void callChatAPI(const std::string& userMessage);
-    void processAPIResponse(const std::string& jsonResponse);
+    // API Callbacks
+    void sendToAPI(const std::string& message);
+    void onAPIResponse(const std::string& response);
 
-    // NEW: Polymorphic interaction
-    void performInteraction(class Player* player);
-
-    // Getters
-    InteractionType getInteractionType() const { return interactionType; }
-    void setAPIEndpoint(const std::string& endpoint) { apiEndpoint = endpoint; }
-    void setShowPrompt(bool show) { showInteractPrompt = show; }
+    // Configuration
+    void setCharacterName(const std::string& name) { characterName = name; }
+    void setPlayerID(const std::string& id) { playerID = id; }
+    std::string getCharacterName() const { return characterName; }
 };

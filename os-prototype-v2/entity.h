@@ -34,10 +34,10 @@ protected:
 
     float spriteWidth;
     float spriteHeight;
-    
+
     bool solid;
     bool active;
-    
+
 
     int currentAnimation;
     int verticalSpriteIndex;
