@@ -18,6 +18,12 @@ struct LevelData {
     // NEW: Split Portal Layers (Must match what your Level Editor exports)
     std::vector<std::vector<int>> portalLayer;
     //std::vector<std::vector<int>> portalFgLayer;
+    std::vector<std::vector<float>> terrainScale;
+    std::vector<std::vector<float>> playerScale;
+    std::vector<std::vector<float>> furnitureScale;
+    std::vector<std::vector<float>> enemyScale;
+    std::vector<std::vector<float>> npcScale;
+    std::vector<std::vector<float>> portalScale;
 };
 
 class LevelLoader {
@@ -26,7 +32,7 @@ public:
 
     LevelData loadLevel(const std::string& levelName);
     std::vector<std::vector<int>> parseCSVGrid(const std::string& filepath);
+    std::vector<std::vector<float>> parseCSVGridFloat(const std::string& filepath); // NEW
 
     void populateGameState(const LevelData& data, class GameState& gs, class ResourceManager& res);
 };
-

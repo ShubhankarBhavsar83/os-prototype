@@ -103,12 +103,12 @@ void EnemyNPC::render(SDL_Renderer* renderer, const SDL_FRect& viewport) {
     // Simple red rectangle for enemy if texture missing
     if (!texture) {
         SDL_SetRenderDrawColor(renderer, 200, 50, 50, 255);
-        SDL_FRect dst = { position.x - viewport.x, position.y - viewport.y, spriteWidth, spriteHeight };
+        SDL_FRect dst = { position.x - viewport.x, position.y - viewport.y, spriteWidth * scale, spriteHeight * scale };
         SDL_RenderFillRect(renderer, &dst);
     }
     else {
         // Normal render logic
-        SDL_FRect dst = { position.x - viewport.x, position.y - viewport.y, spriteWidth, spriteHeight };
+        SDL_FRect dst = { position.x - viewport.x, position.y - viewport.y, spriteWidth * scale, spriteHeight * scale };
         SDL_RenderTexture(renderer, texture, nullptr, &dst);
     }
 }

@@ -16,7 +16,7 @@ Player::Player()
     id = 100;
     spriteWidth = 128.0f;
     spriteHeight = 128.0f;
-    scale = 0.3f;
+    scale = 1.0f;
     maxSpeedX = 50.0f;
     maxSpeedY = 50.0f;
     solid = true;
