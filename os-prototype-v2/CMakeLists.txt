@@ -8,7 +8,7 @@ find_package(glm REQUIRED)
 
 # Add source to this project's executable.
 add_executable (os-prototype-v2 
-    "os-prototype-v2.cpp" 
+"os-prototype-v2.cpp" 
     "os-prototype-v2.h" 
     "animation.h" 
     "timer.h" 
@@ -17,12 +17,13 @@ add_executable (os-prototype-v2
     "player.h" 
     "player.cpp"
     "npc.h"
-    "npc.cpp"              # Add this
+    "npc.cpp"
     "friendlyNpc.h" 
-    "friendlyNpc.cpp"      # Add this
+    "friendlyNpc.cpp"
     "enemyNpc.h"
-    "enemyNpc.cpp"         # Add this
+    "enemyNpc.cpp"         
     "projectile.h" 
+    "projectile.cpp"       
     "furniture.h" 
     "furniture.cpp"
     "entityManager.h" 
@@ -36,7 +37,11 @@ add_executable (os-prototype-v2
     "application.h"
     "application.cpp"
     "coordinateSystem.h"
- "portal.h")
+    "portal.h"
+    "uiManager.h"          
+    "uiManager.cpp"        
+    "movable.h"         
+)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET os-prototype-v2 PROPERTY CXX_STANDARD 20)

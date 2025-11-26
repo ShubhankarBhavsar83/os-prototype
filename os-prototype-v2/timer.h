@@ -5,6 +5,7 @@ class Timer {
 	float lenght, time;
 	bool timeout;
 public:
+	Timer() : lenght(0), time(0), timeout(false) {}
 	Timer(float lenght) : lenght(lenght), time(0), timeout(false) {}
 
 	void step(float deltaTime) {

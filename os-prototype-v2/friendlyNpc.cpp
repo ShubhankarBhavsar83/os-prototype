@@ -3,16 +3,22 @@
 #include "Player.h"
 #include <iostream>
 
-FriendlyNPC::FriendlyNPC()
-    : NPC(NPCType::FRIENDLY), chatActive(false), responseWaitTimer(0.0f) {
-
+FriendlyNPC::FriendlyNPC(InteractionType type, const std::string& name)
+    : NPC(NPCType::FRIENDLY),
+    interactionType(type),  // Initialize with the passed argument
+    npcName(name),          // Initialize with the passed argument
+    chatActive(false),
+    responseWaitTimer(0.0f)
+{
     this->type = EntityType::FRIENDLY_NPC;
     this->solid = true;
     this->spriteWidth = 32.0f;
     this->spriteHeight = 32.0f;
     this->friction = 900.0f;
-}
 
+    // Initialize prompt visibility default
+    this->showInteractPrompt = false;
+}
 void FriendlyNPC::update(float deltaTime, GameState& gs) {
     // Physics
     applyMovement(deltaTime, maxSpeedX, maxSpeedY);

@@ -28,6 +28,8 @@ public:
     void run();
     void shutdown();
 
+    void handleKeyPress(SDL_Scancode key);
+
 private:
     void processEvents();
     void update(float deltaTime);

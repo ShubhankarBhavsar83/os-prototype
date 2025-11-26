@@ -19,16 +19,25 @@ private:
     ProjectileState state;
     ProjectileType projectileType;
 
-    Entity* owner;      // Who fired it
-    Entity* target;     // Homing target
+    Entity* owner;
+    Entity* target;
     float damage;
     float lifetime;
     float maxLifetime;
     float speed;
-    float homingStrength; // 0 = no homing, 1 = perfect tracking
+    float homingStrength;
 
     Timer impactAnimTimer;
     bool hasHit;
+
+    // NEW: Animation system
+    SDL_Texture* projectileTexture;
+    SDL_Texture* impactTexture;
+    int currentAnimFrame;
+    float animTimer;
+    float animFrameDuration;
+    int projectileFrameCount;
+    int impactFrameCount;
 
 public:
     Projectile(ProjectileType type, Entity* owner);
@@ -41,4 +50,8 @@ public:
     void launch(const glm::vec2& direction);
     void onImpact(Entity* hitEntity);
     bool shouldRemove() const;
+
+    // NEW: Animation and texture loading
+    void updateAnimation(float deltaTime);
+    void loadTextures(class ResourceManager& rm);
 };
