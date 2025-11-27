@@ -193,6 +193,7 @@ public:
         loadTexture("tile_ice_water_corner_light", "assets/map_assets/tile_112.png");
         loadTexture("tile_ice_water_rough_light", "assets/map_assets/tile_113.png");
         loadTexture("tile_ice_water_cracked", "assets/map_assets/tile_114.png");
+		loadTexture("marcus", "assets/map_assets/tile_119.png");
         // ====================================================================
         // PROJECTILE ASSETS
         // ====================================================================

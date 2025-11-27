@@ -1,6 +1,7 @@
 #include "FriendlyNpc.h"
 #include "GameState.h"
 #include "Player.h"
+#include "ResourceManager.h" // Needed for loadTextures
 #include <iostream>
 
 // Static member for tracking active chat
@@ -34,8 +35,8 @@ FriendlyNPC::FriendlyNPC()
         this->sendToAPI(message);
         });
 
-    // Add initial greeting message
-    chatSystem.addMessage("NPC", "Hello! Press E to chat.");
+    // Add initial greeting message (only once per instance)
+    // chatSystem.addMessage("NPC", "Hello! Press E to chat."); // Optional: removed to prevent spam on re-open
 
     std::cout << "[FriendlyNPC] Created with character: " << characterName << std::endl;
 }
@@ -53,10 +54,72 @@ FriendlyNPC::~FriendlyNPC() {
 void FriendlyNPC::update(float deltaTime, GameState& gs) {
     // Physics
     applyMovement(deltaTime, maxSpeedX, maxSpeedY);
+
+    // 1. Extract pending messages safely
+    std::vector<std::string> responsesToProcess;
+    {
+        std::lock_guard<std::mutex> lock(responseMutex);
+        if (!pendingResponses.empty()) {
+            responsesToProcess = pendingResponses;
+            pendingResponses.clear();
+        }
+    }
+
+    // 2. Process them on the Main Thread (Safe for SDL/TTF)
+    for (const std::string& response : responsesToProcess) {
+        std::string cleanedResponse = response;
+
+        // --- JSON Parsing Logic ---
+        size_t outputStart = response.find("\"output\"");
+        if (outputStart != std::string::npos) {
+            size_t colonPos = response.find(":", outputStart);
+            if (colonPos != std::string::npos) {
+                size_t openQuotePos = response.find("\"", colonPos);
+                if (openQuotePos != std::string::npos) {
+                    size_t contentStart = openQuotePos + 1;
+                    size_t currentPos = contentStart;
+                    bool foundEnd = false;
+                    while (currentPos < response.length()) {
+                        // Handle escaped characters
+                        if (response[currentPos] == '\\' && currentPos + 1 < response.length()) {
+                            currentPos += 2; continue;
+                        }
+                        if (response[currentPos] == '"') {
+                            foundEnd = true; break;
+                        }
+                        currentPos++;
+                    }
+                    if (foundEnd) {
+                        cleanedResponse = response.substr(contentStart, currentPos - contentStart);
+
+                        // Basic unescaping
+                        size_t pos = 0;
+                        while ((pos = cleanedResponse.find("\\\"", pos)) != std::string::npos) {
+                            cleanedResponse.replace(pos, 2, "\""); pos += 1;
+                        }
+                        pos = 0;
+                        while ((pos = cleanedResponse.find("\\n", pos)) != std::string::npos) {
+                            cleanedResponse.replace(pos, 2, "\n"); pos += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Update State
+        isWaitingForResponse = false;
+        chatSystem.setWaitingForResponse(false);
+        lastResponse = cleanedResponse;
+
+        // Add to Chat (SAFE now because we are in update())
+        chatSystem.addMessage(characterName, cleanedResponse);
+
+        std::cout << "[FriendlyNPC] Processed response on Main Thread." << std::endl;
+    }
 }
 
 void FriendlyNPC::render(SDL_Renderer* renderer, const SDL_FRect& viewport) {
-    // Green rectangle fallback
+    // Green rectangle fallback if texture failed to load
     if (!texture) {
         SDL_SetRenderDrawColor(renderer, 50, 200, 50, 255);
         SDL_FRect dst = {
@@ -103,6 +166,9 @@ void FriendlyNPC::startChat() {
 
     activeChatNPC = this;
     chatSystem.activate();
+
+    // Note: We removed the automatic "Hello" message here to prevent duplication
+    // If the chat history is empty, you could add one here if desired.
 
     std::cout << "[FriendlyNPC] Chat started. Active NPC: " << this << std::endl;
 }
@@ -164,109 +230,38 @@ void FriendlyNPC::sendToAPI(const std::string& message) {
 }
 
 void FriendlyNPC::onAPIResponse(const std::string& response) {
-    std::cout << "[FriendlyNPC] ============ API RESPONSE DEBUG ============" << std::endl;
-    std::cout << "[FriendlyNPC] Raw API Response:" << std::endl;
-    std::cout << response << std::endl;
-    std::cout << "[FriendlyNPC] Raw length: " << response.length() << std::endl;
+    std::cout << "[FriendlyNPC] Received raw API response on background thread." << std::endl;
 
-    std::string cleanedResponse = response;
-
-    // Look for {"output":"..."} or {"output": "..."} pattern
-    size_t outputStart = response.find("\"output\"");
-    if (outputStart != std::string::npos) {
-        std::cout << "[FriendlyNPC] Found 'output' at position: " << outputStart << std::endl;
-
-        // Find the colon after "output"
-        size_t colonPos = response.find(":", outputStart);
-        if (colonPos != std::string::npos) {
-            std::cout << "[FriendlyNPC] Found ':' at position: " << colonPos << std::endl;
-
-            // Find the opening quote after the colon
-            size_t openQuotePos = response.find("\"", colonPos);
-            if (openQuotePos != std::string::npos) {
-                std::cout << "[FriendlyNPC] Found opening quote at position: " << openQuotePos << std::endl;
-
-                // Start reading from after the opening quote
-                size_t contentStart = openQuotePos + 1;
-                std::cout << "[FriendlyNPC] Content starts at position: " << contentStart << std::endl;
-                std::cout << "[FriendlyNPC] First 10 chars: '" << response.substr(contentStart, 10) << "'" << std::endl;
-
-                // Find the closing quote, skipping escaped characters
-                size_t currentPos = contentStart;
-                bool foundEnd = false;
-
-                while (currentPos < response.length()) {
-                    if (response[currentPos] == '\\' && currentPos + 1 < response.length()) {
-                        // Skip escaped character
-                        currentPos += 2;
-                        continue;
-                    }
-                    if (response[currentPos] == '"') {
-                        // Found unescaped quote - this is the end
-                        foundEnd = true;
-                        std::cout << "[FriendlyNPC] Found closing quote at position: " << currentPos << std::endl;
-                        break;
-                    }
-                    currentPos++;
-                }
-
-                if (foundEnd) {
-                    cleanedResponse = response.substr(contentStart, currentPos - contentStart);
-                    std::cout << "[FriendlyNPC] Extracted substring length: " << cleanedResponse.length() << std::endl;
-
-                    // Unescape escaped quotes
-                    size_t pos = 0;
-                    while ((pos = cleanedResponse.find("\\\"", pos)) != std::string::npos) {
-                        cleanedResponse.replace(pos, 2, "\"");
-                        pos += 1;
-                    }
-
-                    // Unescape newlines
-                    pos = 0;
-                    while ((pos = cleanedResponse.find("\\n", pos)) != std::string::npos) {
-                        cleanedResponse.replace(pos, 2, "\n");
-                        pos += 1;
-                    }
-
-                    // Unescape backslashes
-                    pos = 0;
-                    while ((pos = cleanedResponse.find("\\\\", pos)) != std::string::npos) {
-                        cleanedResponse.replace(pos, 2, "\\");
-                        pos += 1;
-                    }
-                }
-                else {
-                    std::cerr << "[FriendlyNPC] ERROR: Could not find closing quote" << std::endl;
-                }
-            }
-            else {
-                std::cerr << "[FriendlyNPC] ERROR: Could not find opening quote after colon" << std::endl;
-            }
-        }
-        else {
-            std::cerr << "[FriendlyNPC] ERROR: Could not find colon after 'output'" << std::endl;
-        }
-    }
-    else {
-        std::cerr << "[FriendlyNPC] ERROR: Could not find 'output' field in response" << std::endl;
-    }
-
-    std::cout << "[FriendlyNPC] ============ FINAL OUTPUT ============" << std::endl;
-    std::cout << "[FriendlyNPC] Cleaned Response: '" << cleanedResponse << "'" << std::endl;
-    std::cout << "[FriendlyNPC] Cleaned length: " << cleanedResponse.length() << std::endl;
-    if (!cleanedResponse.empty()) {
-        std::cout << "[FriendlyNPC] First char ASCII: " << (int)cleanedResponse[0] << " ('" << cleanedResponse[0] << "')" << std::endl;
-    }
-    std::cout << "[FriendlyNPC] =====================================" << std::endl;
-
-    isWaitingForResponse = false;
-    chatSystem.setWaitingForResponse(false);
-    chatSystem.addMessage(characterName, cleanedResponse);
-
-    lastResponse = cleanedResponse;
+    // CRITICAL FIX: Do NOT parse here. Do NOT call chatSystem.addMessage here.
+    // Just store the raw string safely. The 'update' function will handle the rest.
+    std::lock_guard<std::mutex> lock(responseMutex);
+    pendingResponses.push_back(response);
 }
 
 void FriendlyNPC::setScreenDimensions(int width, int height) {
     chatSystem.setScreenDimensions(width, height);
-    std::cout << "[FriendlyNPC] Screen dimensions set to " << width << "x" << height << std::endl;
+}
+
+// FIX: Dynamic texture loading based on setNPCImage
+void FriendlyNPC::loadTextures(ResourceManager& rm) {
+    std::string key = getNPCImage();
+
+    // Default fallback if no key was set
+    if (key.empty()) {
+        key = "npc_elara";
+    }
+
+    texture = rm.getTexture(key);
+
+    if (!texture) {
+        std::cout << "[FriendlyNPC] Warning: Could not find texture for key: " << key << ". Trying fallback." << std::endl;
+        // Try to load it if not found (simple check)
+        rm.loadTexture(key, "assets/npcs/" + key + ".png");
+        texture = rm.getTexture(key);
+
+        // Final fallback to enemy placeholder
+        if (!texture) {
+            texture = rm.getTexture("enemy_placeholder");
+        }
+    }
 }

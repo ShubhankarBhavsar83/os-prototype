@@ -3,6 +3,8 @@
 #include "ApiClient.h"
 #include "ChatSystem.h"
 #include <string>
+#include <vector>
+#include <mutex>
 
 class FriendlyNPC : public NPC {
 private:
@@ -15,6 +17,10 @@ private:
 
     std::string characterName;
     std::string playerID;
+
+    // Thread safety for API responses
+    std::vector<std::string> pendingResponses;
+    std::mutex responseMutex;
 
 public:
     static FriendlyNPC* activeChatNPC;
@@ -35,6 +41,10 @@ public:
     void sendToAPI(const std::string& message);
     void onAPIResponse(const std::string& response);
 
+    // Texture loading
+    void loadTextures(class ResourceManager& rm);
+
+    // Getters and Setters
     void setCharacterName(const std::string& name) { characterName = name; }
     void setPlayerID(const std::string& id) { playerID = id; }
     std::string getCharacterName() const { return characterName; }

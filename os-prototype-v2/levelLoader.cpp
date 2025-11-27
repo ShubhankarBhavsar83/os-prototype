@@ -335,6 +335,36 @@ void LevelLoader::populateGameState(const LevelData& data, GameState& gs, Resour
                     auto npc = std::make_unique<FriendlyNPC>();
                     npc->setPosition(pos);
                     npc->scale = getScaleAt(data.npcScale, r, c);
+
+                    // ===== CHARACTER ASSIGNMENT BASED ON TILE ID =====s
+                    if (id == 119) {
+                        npc->setCharacterName("marcus");
+                        npc->setNPCImage("npc_marcus");
+                        std::cout << "[LevelLoader] Spawned Marcus at (" << c << ", " << r << ")" << std::endl;
+                    }
+                    else if (id == 120) {
+                        npc->setCharacterName("drake");
+                        npc->setNPCImage("npc_drake");
+                        std::cout << "[LevelLoader] Spawned Drake at (" << c << ", " << r << ")" << std::endl;
+                    }
+                    else if (id == 121) {
+                        npc->setCharacterName("elara");
+                        npc->setNPCImage("npc_elara");
+                        std::cout << "[LevelLoader] Spawned Elara at (" << c << ", " << r << ")" << std::endl;
+                    }
+                    else {
+                        // Default character if tile ID not recognized
+                        npc->setCharacterName("elara");
+                        npc->setNPCImage("npc_elara");
+                        std::cout << "[LevelLoader] WARNING: Unknown NPC tile ID " << id << ", defaulting to Elara" << std::endl;
+                    }
+                    // =================================================
+
+                    // FIX: Use the class method to load the texture properly
+                    // This ensures the green box issue is resolved
+                    npc->loadTextures(res);
+                    // =================================================
+
                     gs.addEntity(std::move(npc), LAYER_IDX_CHARACTERS);
                 }
                 catch (...) {

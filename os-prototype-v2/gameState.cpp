@@ -81,6 +81,30 @@ void GameState::render(SDL_Renderer* renderer) {
         }
     }
 
+    // ========================================================================
+    // DEBUG: Render Collision Boxes
+    // ========================================================================
+    //SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for collision
+    //for (auto& layer : layers) {
+    //    for (auto& entity : layer) {
+    //        // Draw box if entity is active and has solid collision
+    //        if (entity && entity->isActive() && entity->isSolid()) {
+    //            SDL_FRect box = entity->getBoundingBox();
+
+    //            // Adjust for camera viewport to get screen coordinates
+    //            SDL_FRect screenBox = {
+    //                box.x - mapViewport.x,
+    //                box.y - mapViewport.y,
+    //                box.w,
+    //                box.h
+    //            };
+
+    //            SDL_RenderRect(renderer, &screenBox);
+    //        }
+    //    }
+    //}
+    // ========================================================================
+
     // Render UI on top (RESTORED from old version)
     uiManager->render(*this);
 }
