@@ -1,5 +1,6 @@
 #pragma once
 #include <SDL3/SDL.h>
+#include <SDL3_ttf/SDL_ttf.h>
 #include <memory>
 #include "GameState.h"
 
@@ -15,10 +16,15 @@ private:
     int logicalHeight;
 
     const bool* keyboardState;
-
     std::unique_ptr<GameState> gameState;
 
     uint64_t previousTime;
+
+    void processEvents();
+    void update(float deltaTime);
+    void render();
+    void handleWindowResize(int width, int height);
+    void updateNPCScreenDimensions();
 
 public:
     Application();
@@ -27,13 +33,4 @@ public:
     bool initialize();
     void run();
     void shutdown();
-
-    void handleKeyPress(SDL_Scancode key);
-
-private:
-    void processEvents();
-    void update(float deltaTime);
-    void render();
-
-    void handleWindowResize(int width, int height);
 };

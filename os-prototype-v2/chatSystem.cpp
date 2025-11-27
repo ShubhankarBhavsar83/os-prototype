@@ -1,27 +1,67 @@
 #include "ChatSystem.h"
 #include <iostream>
+#include <algorithm>
 
 ChatSystem::ChatSystem()
     : active(false), maxVisibleMessages(5), scrollOffset(0),
-    waitingForResponse(false), font(nullptr), fontTexture(nullptr) {
+    waitingForResponse(false), font(nullptr), fontTexture(nullptr),
+    screenWidth(640), screenHeight(320), isRendering(false) {
 
-    if (!TTF_WasInit() && TTF_Init() == -1) {
-        std::cerr << "[ChatSystem] TTF_Init failed! Error: " << std::endl;
-        return; // Stop here if init fails
+    // TTF should already be initialized by Application, but check anyway
+    if (!TTF_WasInit()) {
+        std::cerr << "[ChatSystem] TTF not initialized! Attempting to initialize..." << std::endl;
+        if (TTF_Init() == -1) {
+            std::cerr << "[ChatSystem] TTF_Init failed! " << SDL_GetError() << std::endl;
+            return;
+        }
     }
 
-    chatBoxRect = { 0, 0, 300, 200 };
-    inputBoxRect = { 0, 200, 300, 40 };
+    // Initialize with default positions
+    updateChatPosition();
 
-    font = TTF_OpenFont("assets/font/font.ttf", 16);
+    // Load font - try multiple paths
+    const char* fontPaths[] = {
+        "assets/font/font.ttf",
+        "assets/font.ttf",
+        "../assets/font/font.ttf",
+        "../assets/font.ttf"
+    };
+
+    for (const char* path : fontPaths) {
+        font = TTF_OpenFont(path, 13);
+        if (font) {
+            std::cout << "[ChatSystem] Font loaded successfully from: " << path << std::endl;
+            break;
+        }
+    }
+
     if (!font) {
-        std::cerr << "[ChatSystem] Failed to load font! Check assets/font.ttf" << std::endl;
+        std::cerr << "[ChatSystem] CRITICAL: Failed to load font from all paths!" << std::endl;
+        std::cerr << "[ChatSystem] TTF Error: " << SDL_GetError() << std::endl;
     }
 }
 
 ChatSystem::~ChatSystem() {
-    if (font) TTF_CloseFont(font);
-    if (fontTexture) SDL_DestroyTexture(fontTexture);
+    std::cout << "[ChatSystem] Destructor called - waiting for render to finish..." << std::endl;
+
+    // Wait for any active rendering to finish
+    while (isRendering.load()) {
+        SDL_Delay(1);
+    }
+
+    if (fontTexture) {
+        SDL_DestroyTexture(fontTexture);
+        fontTexture = nullptr;
+        std::cout << "[ChatSystem] Font texture destroyed" << std::endl;
+    }
+
+    if (font) {
+        TTF_CloseFont(font);
+        font = nullptr;
+        std::cout << "[ChatSystem] Font closed" << std::endl;
+    }
+
+    std::cout << "[ChatSystem] Destructor complete" << std::endl;
 }
 
 void ChatSystem::activate() {
@@ -40,20 +80,29 @@ bool ChatSystem::isActive() const {
     return active;
 }
 
-void ChatSystem::setPosition(float x, float y) {
-    // FIXED POSITION: Center the chat window on screen (popup style)
-    // Assuming 640x320 logical screen size from Application.cpp
-    float screenCenterX = 320.0f;  // Half of 640
-    float screenCenterY = 160.0f;  // Half of 320
+void ChatSystem::setScreenDimensions(int width, int height) {
+    screenWidth = width;
+    screenHeight = height;
+    updateChatPosition();
+    std::cout << "[ChatSystem] Screen dimensions updated: " << width << "x" << height << std::endl;
+}
 
-    // Center the chat box
-    chatBoxRect.x = screenCenterX - (chatBoxRect.w / 2);
-    chatBoxRect.y = screenCenterY - (chatBoxRect.h / 2) - 20; // Slightly above center
+void ChatSystem::updateChatPosition() {
+    // Center the chat window on screen
+    float chatWidth = 300.0f;
+    float chatHeight = 200.0f;
 
+    chatBoxRect.w = chatWidth;
+    chatBoxRect.h = chatHeight;
+    chatBoxRect.x = (screenWidth - chatWidth) / 2.0f;
+    chatBoxRect.y = (screenHeight - chatHeight) / 2.0f - 20.0f;
+
+    inputBoxRect.w = chatWidth;
+    inputBoxRect.h = 40.0f;
     inputBoxRect.x = chatBoxRect.x;
     inputBoxRect.y = chatBoxRect.y + chatBoxRect.h;
 
-    std::cout << "[ChatSystem] Position set to CENTER (" << chatBoxRect.x << ", " << chatBoxRect.y << ")" << std::endl;
+    std::cout << "[ChatSystem] Chat positioned at (" << chatBoxRect.x << ", " << chatBoxRect.y << ")" << std::endl;
 }
 
 void ChatSystem::addMessage(const std::string& sender, const std::string& text) {
@@ -63,8 +112,53 @@ void ChatSystem::addMessage(const std::string& sender, const std::string& text) 
     msg.timestamp = SDL_GetTicks();
     messages.push_back(msg);
 
-    if (messages.size() > maxVisibleMessages) {
-        scrollOffset = messages.size() - maxVisibleMessages;
+    calculateMessageHeights();
+
+    std::cout << "[ChatSystem] Message added. Total: " << messages.size() << std::endl;
+}
+
+void ChatSystem::calculateMessageHeights() {
+    if (!font) {
+        static bool warned = false;
+        if (!warned) {
+            std::cerr << "[ChatSystem] WARNING: Font is NULL in calculateMessageHeights()" << std::endl;
+            warned = true;
+        }
+        // Set default heights without font
+        messageHeights.clear();
+        for (size_t i = 0; i < messages.size(); i++) {
+            messageHeights.push_back(18.0f);
+        }
+        return;
+    }
+
+    messageHeights.clear();
+
+    for (const auto& msg : messages) {
+        std::string display = msg.sender + ": " + msg.text;
+
+        // Validate string before rendering
+        if (display.empty()) {
+            messageHeights.push_back(18.0f);
+            continue;
+        }
+
+        SDL_Surface* surf = TTF_RenderText_Blended_Wrapped(
+            font,
+            display.c_str(),
+            display.length(),
+            { 255, 255, 255, 255 },
+            (int)(chatBoxRect.w - 20)
+        );
+
+        if (surf) {
+            messageHeights.push_back((float)surf->h + 5.0f);
+            SDL_DestroySurface(surf);
+        }
+        else {
+            messageHeights.push_back(18.0f);
+            std::cerr << "[ChatSystem] Failed to render text surface for: " << display << std::endl;
+        }
     }
 }
 
@@ -83,9 +177,6 @@ void ChatSystem::handleKeyPress(SDL_Keycode key) {
     }
     else if (key == SDLK_BACKSPACE && !currentInput.empty()) {
         currentInput.pop_back();
-    }
-    else if (key == SDLK_ESCAPE) {
-        deactivate();
     }
 }
 
@@ -112,74 +203,227 @@ void ChatSystem::setWaitingForResponse(bool waiting) {
 
 void ChatSystem::render(SDL_Renderer* renderer) {
     if (!active) return;
-    if (!font) return;
 
-    // Draw Chat Box Background
+    // Set rendering flag
+    isRendering.store(true);
+
+    if (!font) {
+        std::cerr << "[ChatSystem] ERROR: Font is NULL in render()" << std::endl;
+        isRendering.store(false);
+        return;
+    }
+
+    if (messages.size() != messageHeights.size()) {
+        calculateMessageHeights();
+    }
+
+    // Draw chat box background
     SDL_SetRenderDrawColor(renderer, 40, 40, 40, 230);
     SDL_RenderFillRect(renderer, &chatBoxRect);
-
     SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
     SDL_RenderRect(renderer, &chatBoxRect);
 
-    // Draw Messages
-    int yStart = chatBoxRect.y + 10;
-    int visibleCount = 0;
+    // Set clip rect for messages
+    SDL_Rect clipRect = {
+        (int)chatBoxRect.x,
+        (int)chatBoxRect.y,
+        (int)chatBoxRect.w,
+        (int)chatBoxRect.h
+    };
+    SDL_SetRenderClipRect(renderer, &clipRect);
 
-    size_t startIdx = (messages.size() > maxVisibleMessages) ? messages.size() - maxVisibleMessages : 0;
+    // Render messages from bottom up
+    float currentY = chatBoxRect.y + chatBoxRect.h - 10;
 
-    for (size_t i = startIdx; i < messages.size(); ++i) {
-        renderMessage(renderer, messages[i], yStart + (visibleCount * 30));
-        visibleCount++;
+    for (int i = (int)messages.size() - 1; i >= 0; i--) {
+        if (i >= (int)messageHeights.size()) continue;
+
+        float msgHeight = messageHeights[i];
+        currentY -= msgHeight;
+
+        renderMessage(renderer, messages[i], currentY);
+
+        if (currentY < chatBoxRect.y - 50) break;
     }
 
-    // Draw Waiting Indicator
-    if (waitingForResponse) {
-        std::string waitText = "...";
-        SDL_Surface* surf = TTF_RenderText_Blended(font, waitText.c_str(), 0, { 150, 150, 150, 255 });
+    SDL_SetRenderClipRect(renderer, nullptr);
+
+    // Draw waiting indicator at the BOTTOM of the chat box, just above input
+    if (waitingForResponse && font) {
+        std::string waitText = "NPC is typing...";
+
+        SDL_Surface* surf = nullptr;
+        try {
+            surf = TTF_RenderText_Blended(font, waitText.c_str(), 0, { 200, 200, 100, 255 });
+        }
+        catch (...) {
+            std::cerr << "[ChatSystem] Exception rendering waiting indicator" << std::endl;
+        }
+
         if (surf) {
+            // Draw background for indicator
+            SDL_FRect bgRect = {
+                chatBoxRect.x + 5,
+                chatBoxRect.y + chatBoxRect.h - (float)surf->h - 10.0f,
+                (float)surf->w + 10.0f,
+                (float)surf->h + 5.0f
+            };
+            SDL_SetRenderDrawColor(renderer, 60, 60, 40, 200);
+            SDL_RenderFillRect(renderer, &bgRect);
+
             SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surf);
-            SDL_FRect dst = { chatBoxRect.x + 10, chatBoxRect.y + chatBoxRect.h - 30, (float)surf->w, (float)surf->h };
-            SDL_RenderTexture(renderer, tex, nullptr, &dst);
-            SDL_DestroyTexture(tex);
+            if (tex) {
+                SDL_FRect dst = {
+                    chatBoxRect.x + 10,
+                    chatBoxRect.y + chatBoxRect.h - (float)surf->h - 7.5f,
+                    (float)surf->w,
+                    (float)surf->h
+                };
+                SDL_RenderTexture(renderer, tex, nullptr, &dst);
+                SDL_DestroyTexture(tex);
+            }
             SDL_DestroySurface(surf);
         }
     }
 
     renderInputBox(renderer);
+
+    // Clear rendering flag
+    isRendering.store(false);
 }
 
 float ChatSystem::renderMessage(SDL_Renderer* renderer, const ChatMessage& msg, float yOffset) {
-    SDL_Color color = (msg.sender == "Player") ? SDL_Color{ 100, 200, 255, 255 } : SDL_Color{ 255, 200, 100, 255 };
+    if (!font) {
+        std::cerr << "[ChatSystem] ERROR: Font is NULL in renderMessage()" << std::endl;
+        return 0.0f;
+    }
+
+    SDL_Color color = (msg.sender == "Player") ?
+        SDL_Color{ 100, 200, 255, 255 } :
+        SDL_Color{ 255, 200, 100, 255 };
+
     std::string display = msg.sender + ": " + msg.text;
 
-    SDL_Surface* surf = TTF_RenderText_Blended_Wrapped(font, display.c_str(), display.length(), color, chatBoxRect.w - 20);
+    // Validate string
+    if (display.empty()) {
+        return 0.0f;
+    }
+
+    SDL_Surface* surf = nullptr;
+
+    try {
+        surf = TTF_RenderText_Blended_Wrapped(
+            font,
+            display.c_str(),
+            display.length(),
+            color,
+            (int)(chatBoxRect.w - 20)
+        );
+    }
+    catch (...) {
+        std::cerr << "[ChatSystem] Exception during text rendering" << std::endl;
+        return 0.0f;
+    }
 
     float messageHeight = 0;
     if (surf) {
         SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surf);
-        SDL_FRect dst = { chatBoxRect.x + 10, yOffset, (float)surf->w, (float)surf->h };
-        SDL_RenderTexture(renderer, tex, nullptr, &dst);
-        messageHeight = (float)surf->h;
-        SDL_DestroyTexture(tex);
+        if (tex) {
+            SDL_FRect dst = {
+                chatBoxRect.x + 10,
+                yOffset,
+                (float)surf->w,
+                (float)surf->h
+            };
+            SDL_RenderTexture(renderer, tex, nullptr, &dst);
+            messageHeight = (float)surf->h;
+            SDL_DestroyTexture(tex);
+        }
         SDL_DestroySurface(surf);
+    }
+    else {
+        std::cerr << "[ChatSystem] Failed to render text surface: " << display << std::endl;
     }
 
     return messageHeight;
 }
 
 void ChatSystem::renderInputBox(SDL_Renderer* renderer) {
+    if (!font) {
+        std::cerr << "[ChatSystem] ERROR: Font is NULL in renderInputBox()" << std::endl;
+        return;
+    }
+
+    // Draw background
     SDL_SetRenderDrawColor(renderer, 20, 20, 20, 255);
     SDL_RenderFillRect(renderer, &inputBoxRect);
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderRect(renderer, &inputBoxRect);
 
+    // Prepare text with cursor
     std::string textToShow = "> " + currentInput + (SDL_GetTicks() % 1000 < 500 ? "_" : "");
-    SDL_Surface* surf = TTF_RenderText_Blended(font, textToShow.c_str(), 0, { 255, 255, 255, 255 });
+
+    if (textToShow.empty()) return;
+
+    SDL_Surface* surf = nullptr;
+    try {
+        surf = TTF_RenderText_Blended(font, textToShow.c_str(), 0, { 255, 255, 255, 255 });
+    }
+    catch (...) {
+        std::cerr << "[ChatSystem] Exception rendering input box text" << std::endl;
+        return;
+    }
+
     if (surf) {
         SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surf);
-        SDL_FRect dst = { inputBoxRect.x + 5, inputBoxRect.y + 5, (float)surf->w, (float)surf->h };
-        SDL_RenderTexture(renderer, tex, nullptr, &dst);
-        SDL_DestroyTexture(tex);
+        if (tex) {
+            float textW = (float)surf->w;
+            float textH = (float)surf->h;
+
+            SDL_FRect visibleArea = {
+                inputBoxRect.x + 5,
+                inputBoxRect.y + 5,
+                inputBoxRect.w - 10,
+                inputBoxRect.h - 10
+            };
+
+            SDL_FRect dstRect;
+            SDL_FRect srcRect;
+
+            if (textW > visibleArea.w) {
+                // Text too long, show right side
+                srcRect.x = textW - visibleArea.w;
+                srcRect.y = 0.0f;
+                srcRect.w = visibleArea.w;
+                srcRect.h = textH;
+                dstRect = { visibleArea.x, visibleArea.y, visibleArea.w, textH };
+            }
+            else {
+                // Text fits
+                srcRect.x = 0.0f;
+                srcRect.y = 0.0f;
+                srcRect.w = textW;
+                srcRect.h = textH;
+                dstRect = { visibleArea.x, visibleArea.y, textW, textH };
+            }
+
+            SDL_Rect inputClip = {
+                (int)inputBoxRect.x,
+                (int)inputBoxRect.y,
+                (int)inputBoxRect.w,
+                (int)inputBoxRect.h
+            };
+            SDL_SetRenderClipRect(renderer, &inputClip);
+
+            SDL_RenderTexture(renderer, tex, &srcRect, &dstRect);
+
+            SDL_SetRenderClipRect(renderer, nullptr);
+
+            SDL_DestroyTexture(tex);
+        }
         SDL_DestroySurface(surf);
+    }
+    else {
+        std::cerr << "[ChatSystem] Failed to render input text surface" << std::endl;
     }
 }

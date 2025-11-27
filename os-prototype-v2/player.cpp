@@ -400,6 +400,15 @@ void Player::handleCollision(Entity* other) {
 }
 
 void Player::handleInput(const bool* keyState, GameState& gs) {
+
+    if (FriendlyNPC::activeChatNPC != nullptr) {
+        // Stop the player completely
+        velocity = glm::vec2(0, 0);
+        acceleration = glm::vec2(0, 0);
+
+        // Return early so no movement keys are processed
+        return;
+    }
     current_acceleration = glm::vec2(0.0f, 0.0f);
 
     struct MoveDirectionSet {
