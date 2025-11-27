@@ -8,7 +8,8 @@ enum class PlayerState {
     RUNNING,
     DASHING,
     ATTACKING_MELEE,
-    ATTACKING_RANGED
+    ATTACKING_RANGED,
+    DEAD
 };
 
 enum class TargetingMode {
@@ -30,14 +31,14 @@ private:
     bool canDash;
     int directionIndex;
 
-    // NEW: Combat system
+    // Combat system
     Entity* targetEntity;
     std::vector<Entity*> enemiesInRange;
     int currentTargetIndex;
     float targetingRange;
     TargetingMode targetingMode;
 
-    // NEW: Melee attack
+    // Melee attack
     Timer meleeCooldown;
     float meleeRange;
     float meleeDamage;
@@ -46,18 +47,29 @@ private:
     float meleeAnimDuration;
     float meleeAnimTimer;
 
-    // NEW: Ranged attack (fireball)
+    // Ranged attack (fireball)
     Timer fireballCooldown;
     float fireballDamage;
     bool canCastFireball;
+
+    // NEW: Global Action Cooldown (500ms)
+    Timer globalActionCooldown;
+    bool canPerformAction;
 
     // Interaction
     Entity* interactableNearby;
     float interactionRange;
 
-    // NEW: HP system
+    // HP system
     float health;
     float maxHealth;
+
+    // Death timer for respawn delay
+    float deathTimer;
+
+    // NEW: Input state tracking to prevent held key spam
+    bool meleeKeyWasPressed;
+    bool rangedKeyWasPressed;
 
 public:
     Player();
@@ -70,25 +82,26 @@ public:
     // Movement
     void startDash();
 
-    // NEW: Combat methods
+    // Combat methods
     void meleeAttack(GameState& gs);
-    void rangedAttack(GameState& gs); // Fireball
+    void rangedAttack(GameState& gs);
     void updateAttackHitbox();
     SDL_FRect getMeleeHitbox() const { return meleeHitbox; }
     bool isCurrentlyAttacking() const { return isMeleeAttacking; }
 
-    // NEW: Targeting system
-    void cycleTarget(GameState& gs); // TAB key
+    // Targeting system
+    void cycleTarget(GameState& gs);
     void updateTargeting(GameState& gs);
     void findEnemiesInRange(GameState& gs);
     Entity* findNearestEnemy(GameState& gs);
     void clearTarget();
+    void dropTarget();  // NEW: Drop current target
 
-    // NEW: Interaction (polymorphic)
+    // Interaction (polymorphic)
     void interact(GameState& gs);
     void checkForInteractables(GameState& gs);
 
-    // NEW: HP system
+    // HP system
     void takeDamage(float damage);
     void heal(float amount);
     float getHealthPercent() const { return health / maxHealth; }

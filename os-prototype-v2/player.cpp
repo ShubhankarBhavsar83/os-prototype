@@ -14,10 +14,12 @@ Player::Player()
     targetEntity(nullptr), currentTargetIndex(-1), targetingRange(400.0f),
     targetingMode(TargetingMode::NEAREST), interactableNearby(nullptr),
     interactionRange(60.0f), directionIndex(2),
-    meleeCooldown(0.6f), meleeRange(50.0f), meleeDamage(25.0f),
+    meleeCooldown(0.6f), meleeRange(50.0f), meleeDamage(50.0f),
     isMeleeAttacking(false), meleeAnimDuration(0.4f), meleeAnimTimer(0.0f),
-    fireballCooldown(2.0f), fireballDamage(40.0f), canCastFireball(true),
-    health(100.0f), maxHealth(100.0f) {
+    fireballCooldown(2.0f), fireballDamage(33.33f), canCastFireball(true),
+    globalActionCooldown(0.5f), canPerformAction(true),
+    health(100.0f), maxHealth(100.0f), deathTimer(0.0f),
+    meleeKeyWasPressed(false), rangedKeyWasPressed(false) {
 
     type = EntityType::PLAYER;
     id = 100;
@@ -32,11 +34,25 @@ Player::Player()
     maxSpeedY = 50.0f;
 
     collider = Collider(49.0f * scale, 45.0f * scale, 39.0f * scale, 39.0f * scale, true);
-
 }
 
 void Player::update(float deltaTime, GameState& gs) {
-    // Update dash cooldown
+    if (state == PlayerState::DEAD) {
+        deathTimer += deltaTime;
+        velocity = glm::vec2(0, 0);
+        acceleration = glm::vec2(0, 0);
+        return;
+    }
+
+    if (health <= 0) {
+        state = PlayerState::DEAD;
+        deathTimer = 0.0f;
+        velocity = glm::vec2(0, 0);
+        acceleration = glm::vec2(0, 0);
+        std::cout << "[Player] YOU DIED!" << std::endl;
+        return;
+    }
+
     uint64_t nowTime = SDL_GetTicks();
     if (dashCooldownMark > 0) {
         dashDuration = nowTime - dashCooldownMark;
@@ -47,11 +63,14 @@ void Player::update(float deltaTime, GameState& gs) {
         }
     }
 
-    // Update attack cooldowns
+    globalActionCooldown.step(deltaTime);
+    if (globalActionCooldown.isTimeout()) {
+        canPerformAction = true;
+    }
+
     meleeCooldown.step(deltaTime);
     fireballCooldown.step(deltaTime);
 
-    // Update melee attack animation
     if (isMeleeAttacking) {
         meleeAnimTimer += deltaTime;
         if (meleeAnimTimer >= meleeAnimDuration) {
@@ -61,13 +80,9 @@ void Player::update(float deltaTime, GameState& gs) {
         }
     }
 
-    // Update targeting (NEW: Now properly finds and highlights enemies)
     updateTargeting(gs);
-
-    // Check for nearby interactables
     checkForInteractables(gs);
 
-    // State machine
     switch (state) {
     case PlayerState::IDLE: {
         if (currentAnimation != 1) {
@@ -119,6 +134,7 @@ void Player::update(float deltaTime, GameState& gs) {
     }
 
     case PlayerState::ATTACKING_RANGED: {
+        velocity = glm::vec2(0, 0);
         state = PlayerState::IDLE;
         break;
     }
@@ -150,53 +166,73 @@ void Player::updateAttackHitbox() {
 }
 
 void Player::meleeAttack(GameState& gs) {
-    if (isMeleeAttacking || !meleeCooldown.isTimeout()) return;
+    if (isMeleeAttacking || !meleeCooldown.isTimeout() || !canPerformAction) return;
+    if (state == PlayerState::DEAD) return;
 
     state = PlayerState::ATTACKING_MELEE;
+    texture = gs.getResourceManager().getTexture("player_melee");
+    if (currentAnimation != 3) {
+        playAnimation(3);
+    }
     isMeleeAttacking = true;
     meleeAnimTimer = 0.0f;
     meleeCooldown.reset();
 
+    globalActionCooldown.reset();
+    canPerformAction = false;
+
     updateAttackHitbox();
 
-    std::cout << "Player performs melee attack!" << std::endl;
+    std::cout << "[Player] Melee attack! (Damage: " << meleeDamage << ")" << std::endl;
 }
 
 void Player::rangedAttack(GameState& gs) {
-    if (!fireballCooldown.isTimeout() || !targetEntity) return;
+
+    if (!fireballCooldown.isTimeout() || !canPerformAction || !targetEntity) return;
+    if (state == PlayerState::DEAD) return;
+    texture = gs.getResourceManager().getTexture("player_ranged");
+    if (currentAnimation != 4) {
+        playAnimation(4);
+    }
 
     state = PlayerState::ATTACKING_RANGED;
     fireballCooldown.reset();
 
-    // Create fireball projectile
-    auto fireball = std::make_unique<Projectile>(ProjectileType::FIREBALL, this);
-    fireball->setPosition(position);
-    fireball->setTarget(targetEntity);
+    globalActionCooldown.reset();
+    canPerformAction = false;
 
-    glm::vec2 direction = glm::normalize(targetEntity->getPosition() - position);
+    auto fireball = std::make_unique<Projectile>(ProjectileType::FIREBALL, this);
+
+    glm::vec2 playerCenter = position + glm::vec2(
+        (spriteWidth * scale) / 2.0f,
+        (spriteHeight * scale) / 2.0f
+    );
+    fireball->setPosition(playerCenter);
+
+    fireball->setTarget(targetEntity);
+    fireball->setDamage(fireballDamage);
+
+    glm::vec2 targetCenter = targetEntity->getPosition() + glm::vec2(
+        (targetEntity->spriteWidth * targetEntity->scale) / 2.0f,
+        (targetEntity->spriteHeight * targetEntity->scale) / 2.0f
+    );
+    glm::vec2 direction = glm::normalize(targetCenter - playerCenter);
     fireball->launch(direction);
 
-    // Add to projectiles layer
+    fireball->loadTextures(gs.getResourceManager());
     gs.addEntity(std::move(fireball), LAYER_IDX_PROJECTILES);
 
-    std::cout << "Player casts fireball at target!" << std::endl;
+    std::cout << "[Player] Fireball cast! (Damage: " << fireballDamage << ")" << std::endl;
 }
 
-// ============================================================================
-// TARGETING SYSTEM (UPDATED)
-// ============================================================================
-
 void Player::updateTargeting(GameState& gs) {
-    // Find all enemies in range
     findEnemiesInRange(gs);
 
-    // Clear previous target highlight
     if (targetEntity && targetEntity->getType() == EntityType::ENEMY) {
         EnemyNPC* previousTarget = static_cast<EnemyNPC*>(targetEntity);
         previousTarget->setTargeted(false);
     }
 
-    // Validate current target
     if (targetEntity) {
         bool targetValid = false;
         for (Entity* enemy : enemiesInRange) {
@@ -214,7 +250,6 @@ void Player::updateTargeting(GameState& gs) {
         }
     }
 
-    // Set target highlight
     if (targetEntity && targetEntity->getType() == EntityType::ENEMY) {
         EnemyNPC* currentTarget = static_cast<EnemyNPC*>(targetEntity);
         currentTarget->setTargeted(true);
@@ -224,14 +259,12 @@ void Player::updateTargeting(GameState& gs) {
 void Player::findEnemiesInRange(GameState& gs) {
     enemiesInRange.clear();
 
-    // Get enemies from game state
     std::vector<Entity*> enemies = gs.getEnemiesInRange(position, targetingRange);
 
     for (Entity* enemy : enemies) {
         enemiesInRange.push_back(enemy);
     }
 
-    // Sort by distance if using NEAREST mode
     if (targetingMode == TargetingMode::NEAREST && !enemiesInRange.empty()) {
         std::sort(enemiesInRange.begin(), enemiesInRange.end(),
             [this](Entity* a, Entity* b) {
@@ -247,23 +280,33 @@ void Player::cycleTarget(GameState& gs) {
         return;
     }
 
-    // Clear previous target highlight
     if (targetEntity && targetEntity->getType() == EntityType::ENEMY) {
         EnemyNPC* previousTarget = static_cast<EnemyNPC*>(targetEntity);
         previousTarget->setTargeted(false);
     }
 
-    // Cycle through available targets
     currentTargetIndex = (currentTargetIndex + 1) % enemiesInRange.size();
     targetEntity = enemiesInRange[currentTargetIndex];
 
-    // Set new target highlight
     if (targetEntity && targetEntity->getType() == EntityType::ENEMY) {
         EnemyNPC* newTarget = static_cast<EnemyNPC*>(targetEntity);
         newTarget->setTargeted(true);
     }
 
-    std::cout << "Target cycled to enemy " << currentTargetIndex << std::endl;
+    std::cout << "[Player] Target cycled to enemy " << currentTargetIndex << std::endl;
+}
+
+void Player::dropTarget() {
+    if (targetEntity) {
+        if (targetEntity->getType() == EntityType::ENEMY) {
+            EnemyNPC* previousTarget = static_cast<EnemyNPC*>(targetEntity);
+            previousTarget->setTargeted(false);
+        }
+        std::cout << "[Player] Target dropped" << std::endl;
+    }
+
+    targetEntity = nullptr;
+    currentTargetIndex = -1;
 }
 
 Entity* Player::findNearestEnemy(GameState& gs) {
@@ -282,7 +325,6 @@ Entity* Player::findNearestEnemy(GameState& gs) {
 }
 
 void Player::clearTarget() {
-    // Clear target highlight
     if (targetEntity && targetEntity->getType() == EntityType::ENEMY) {
         EnemyNPC* previousTarget = static_cast<EnemyNPC*>(targetEntity);
         previousTarget->setTargeted(false);
@@ -292,12 +334,9 @@ void Player::clearTarget() {
     currentTargetIndex = -1;
 }
 
-// ============================================================================
-
 void Player::checkForInteractables(GameState& gs) {
     interactableNearby = nullptr;
 
-    // Check for friendly NPCs
     std::vector<Entity*> characters = gs.getEntitiesInRange(position, interactionRange, LAYER_IDX_CHARACTERS);
     for (Entity* entity : characters) {
         if (entity->getType() == EntityType::FRIENDLY_NPC) {
@@ -306,7 +345,6 @@ void Player::checkForInteractables(GameState& gs) {
         }
     }
 
-    // Check for portals
     std::vector<Entity*> portals = gs.getEntitiesInRange(position, interactionRange, LAYER_IDX_PORTAL_BACKGROUND);
     for (Entity* entity : portals) {
         if (entity->getType() == EntityType::PORTAL) {
@@ -318,19 +356,20 @@ void Player::checkForInteractables(GameState& gs) {
 
 void Player::interact(GameState& gs) {
     if (!interactableNearby) return;
+    if (state == PlayerState::DEAD) return;
 
     switch (interactableNearby->getType()) {
     case EntityType::FRIENDLY_NPC: {
         FriendlyNPC* npc = static_cast<FriendlyNPC*>(interactableNearby);
         npc->onPlayerInteract(this);
-        std::cout << "Interacting with Friendly NPC" << std::endl;
+        std::cout << "[Player] Interacting with Friendly NPC" << std::endl;
         break;
     }
 
     case EntityType::PORTAL: {
         Portal* portal = static_cast<Portal*>(interactableNearby);
         portal->interact(&gs);
-        std::cout << "Using Portal" << std::endl;
+        std::cout << "[Player] Using Portal" << std::endl;
         break;
     }
 
@@ -340,19 +379,31 @@ void Player::interact(GameState& gs) {
 }
 
 void Player::takeDamage(float damage) {
+    if (state == PlayerState::DEAD) return;
+
     health -= damage;
     if (health < 0) health = 0;
 
-    std::cout << "Player took " << damage << " damage. HP: " << health << "/" << maxHealth << std::endl;
+    std::cout << "[Player] Took " << damage << " damage. HP: " << health << "/" << maxHealth << std::endl;
+
+    if (health <= 0) {
+        std::cout << "[Player] Health reached 0!" << std::endl;
+    }
 }
 
 void Player::heal(float amount) {
+    if (state == PlayerState::DEAD) return;
+
     health += amount;
     if (health > maxHealth) health = maxHealth;
 }
 
 void Player::render(SDL_Renderer* renderer, const SDL_FRect& viewport) {
     if (!texture) return;
+
+    if (state == PlayerState::DEAD) {
+        return;
+    }
 
     float srcX = currentAnimation != -1 ? animations[currentAnimation].currentFrame() * spriteWidth : 0.0f;
     float srcY = verticalSpriteIndex * spriteHeight;
@@ -367,8 +418,7 @@ void Player::render(SDL_Renderer* renderer, const SDL_FRect& viewport) {
 
     SDL_RenderTexture(renderer, texture, &src, &dst);
 
-    // DEBUG: Draw targeting line to current target
-    if (targetEntity) {
+    if (targetEntity && state != PlayerState::DEAD) {
         SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
         SDL_RenderLine(renderer,
             position.x - viewport.x + (spriteWidth * scale) / 2,
@@ -379,6 +429,7 @@ void Player::render(SDL_Renderer* renderer, const SDL_FRect& viewport) {
 }
 
 void Player::handleCollision(Entity* other) {
+    if (state == PlayerState::DEAD) return;
     if (!other->isSolid()) return;
 
     SDL_FRect myRect = getBoundingBox();
@@ -400,15 +451,18 @@ void Player::handleCollision(Entity* other) {
 }
 
 void Player::handleInput(const bool* keyState, GameState& gs) {
-
-    if (FriendlyNPC::activeChatNPC != nullptr) {
-        // Stop the player completely
+    if (state == PlayerState::DEAD) {
         velocity = glm::vec2(0, 0);
         acceleration = glm::vec2(0, 0);
-
-        // Return early so no movement keys are processed
         return;
     }
+
+    if (FriendlyNPC::activeChatNPC != nullptr) {
+        velocity = glm::vec2(0, 0);
+        acceleration = glm::vec2(0, 0);
+        return;
+    }
+
     current_acceleration = glm::vec2(0.0f, 0.0f);
 
     struct MoveDirectionSet {
@@ -418,7 +472,6 @@ void Player::handleInput(const bool* keyState, GameState& gs) {
 
     MoveDirectionSet movementDirectionSet{ 0, 0 };
 
-    // Movement
     if (keyState[SDL_SCANCODE_A]) movementDirectionSet.X -= 1.0f;
     if (keyState[SDL_SCANCODE_D]) movementDirectionSet.X += 1.0f;
     if (keyState[SDL_SCANCODE_W]) movementDirectionSet.Y -= 1.0f;
@@ -437,25 +490,36 @@ void Player::handleInput(const bool* keyState, GameState& gs) {
 
     acceleration = current_acceleration;
 
-    // Dash
     if (keyState[SDL_SCANCODE_L] && canDash &&
         (movementDirectionSet.X != 0 || movementDirectionSet.Y != 0)) {
         startDash();
     }
 
-    // Melee Attack
     if (keyState[SDL_SCANCODE_K]) {
-        meleeAttack(gs);
+        if (!meleeKeyWasPressed) {
+            meleeAttack(gs);
+            meleeKeyWasPressed = true;
+        }
+    }
+    else {
+        meleeKeyWasPressed = false;
     }
 
-    // Ranged Attack
     if (keyState[SDL_SCANCODE_J]) {
-        rangedAttack(gs);
+        if (!rangedKeyWasPressed) {
+            rangedAttack(gs);
+            rangedKeyWasPressed = true;
+        }
+    }
+    else {
+        rangedKeyWasPressed = false;
     }
 }
 
 void Player::startDash() {
     if (!canDash) return;
+    if (state == PlayerState::DEAD) return;
+
     state = PlayerState::DASHING;
     dashCooldownMark = SDL_GetTicks();
 }

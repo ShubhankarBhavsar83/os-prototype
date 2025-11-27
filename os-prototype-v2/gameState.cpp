@@ -33,9 +33,9 @@ GameState::GameState(SDL_Renderer* renderer, int viewportWidth, int viewportHeig
     uiManager = std::make_unique<UIManager>(renderer);
 
     // Setup UI ability icons (RESTORED from old version)
-    uiManager->addAbilityIcon("Dash", "assets/ui/dash_icon.png", 5.0f);
-    uiManager->addAbilityIcon("Melee", "assets/ui/melee_icon.png", 0.6f);
-    uiManager->addAbilityIcon("Fireball", "assets/ui/fireball_icon.png", 2.0f);
+    //uiManager->addAbilityIcon("Dash", "assets/ui/dash_icon.png", 5.0f);
+    //uiManager->addAbilityIcon("Melee", "assets/ui/melee_icon.png", 0.6f);
+    //uiManager->addAbilityIcon("Fireball", "assets/ui/fireball_icon.png", 2.0f);
 }
 
 void GameState::update(float deltaTime) {

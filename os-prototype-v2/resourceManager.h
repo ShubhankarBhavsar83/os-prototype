@@ -53,30 +53,50 @@ public:
         loadTexture("player_run", "assets/player_assets/Run.png");
         loadTexture("player_idle", "assets/player_assets/Idle.png");
         loadTexture("player_roll", "assets/player_assets/Rolling.png");
+        loadTexture("player_melee", "assets/player_assets/Melee.png");
+        loadTexture("player_ranged", "assets/player_assets/CastSpell.png");
+
+
 
         // ====================================================================
-        // ENEMY ASSETS
+        // ENEMY ASSETS - Using Tile Sprites (8-Directional Animations)
         // ====================================================================
-        // Beast (Fast Melee)
-        loadTexture("beast_idle", "assets/enemy_assets/beast_idle.png");
-        loadTexture("beast_walk", "assets/enemy_assets/beast_walk.png");
-        loadTexture("beast_attack", "assets/enemy_assets/beast_attack.png");
 
-        // Halberd Fighter (Medium Melee)
-        loadTexture("halberd_idle", "assets/enemy_assets/halberd_idle.png");
-        loadTexture("halberd_walk", "assets/enemy_assets/halberd_walk.png");
-        loadTexture("halberd_attack", "assets/enemy_assets/halberd_attack.png");
+        // BOSS (Reaper - Images 3-7)
+        // tile_115 = idle (Image 5)
+        // tile_116 = attack (Image 3) 
+        // tile_117 = death (Image 4)
+        // tile_118 = walk/run (Image 7)
+        loadTexture("boss_idle", "");
+        loadTexture("boss_walk", "assets/map_assets/tile_118.png");
+        loadTexture("boss_attack", "assets/map_assets/tile_116.png");
+        loadTexture("boss_death", "assets/map_assets/tile_117.png");
 
-        // Boss (Heavy Melee)
-        loadTexture("boss_idle", "assets/enemy_assets/boss_idle.png");
-        loadTexture("boss_walk", "assets/enemy_assets/boss_walk.png");
-        loadTexture("boss_attack", "assets/enemy_assets/boss_attack.png");
+        // BEAST (Dark Blue Creature - Images 8-11)
+        // tile_119 = idle (Image 10)
+        // tile_120 = walk/run (Image 8)
+        // tile_121 = attack (Image 9)
+        // tile_122 = death (Image 11)
+        loadTexture("beast_idle", "assets/enemy_assets/beast_enemy/Idle_Beast.png");
+        loadTexture("beast_walk", "assets/enemy_assets/beast_enemy/Run_Beast.png");
+        loadTexture("beast_attack", "assets/enemy_assets/beast_enemy/Attack_Beast.png");
+        loadTexture("beast_death", "assets/enemy_assets/beast_enemy/Death_Beast.png");
+
+        // HALBERD FIGHTER (Foot Soldier - Images 12-15)
+        // tile_123 = idle (Image 14)
+        // tile_124 = walk/run (Image 12)
+        // tile_125 = attack (Image 13)
+        // tile_126 = death (Image 15)
+        loadTexture("halberd_idle", "assets/map_assets/tile_123.png");
+        loadTexture("halberd_walk", "assets/map_assets/tile_124.png");
+        loadTexture("halberd_attack", "assets/map_assets/tile_125.png");
+        loadTexture("halberd_death", "assets/map_assets/tile_126.png");
 
         // Generic enemy fallback
-        loadTexture("enemy_placeholder", "assets/enemy_assets/enemy_placeholder.png");
+        loadTexture("enemy_placeholder", "assets/map_assets/tile_119.png");
 
         // ====================================================================
-        // TILE ASSETS
+        // TILE ASSETS (kept as-is)
         // ====================================================================
         loadTexture("tile_dark_dirt_textured", "assets/map_assets/tile_006.png");
         loadTexture("tile_dirt", "assets/map_assets/tile_003.png");
@@ -193,18 +213,28 @@ public:
         loadTexture("tile_ice_water_corner_light", "assets/map_assets/tile_112.png");
         loadTexture("tile_ice_water_rough_light", "assets/map_assets/tile_113.png");
         loadTexture("tile_ice_water_cracked", "assets/map_assets/tile_114.png");
+
+        // NEW: Enemy tiles explicitly loaded (these are the animated sprites)
+        loadTexture("tile_115", "assets/map_assets/tile_115.png");  // Boss Idle
+        loadTexture("tile_116", "assets/map_assets/tile_116.png");  // Boss Attack
+        loadTexture("tile_117", "assets/map_assets/tile_117.png");  // Boss Death
+        loadTexture("tile_118", "assets/map_assets/tile_118.png");  // Boss Walk
+        loadTexture("tile_119", "assets/map_assets/tile_119.png");  // Beast Idle
+        loadTexture("tile_120", "assets/map_assets/tile_120.png");  // Beast Walk
+        loadTexture("tile_121", "assets/map_assets/tile_121.png");  // Beast Attack
+        loadTexture("tile_122", "assets/map_assets/tile_122.png");  // Beast Death
+        loadTexture("tile_123", "assets/map_assets/tile_123.png");  // Halberd Idle
+        loadTexture("tile_124", "assets/map_assets/tile_124.png");  // Halberd Walk
+        loadTexture("tile_125", "assets/map_assets/tile_125.png");  // Halberd Attack
+        loadTexture("tile_126", "assets/map_assets/tile_126.png");  // Halberd Death
+
         // ====================================================================
-        // PROJECTILE ASSETS
+        // PROJECTILE ASSETS (8-Directional)
         // ====================================================================
-        // Fireball
         loadTexture("fireball", "assets/projectile_assets/fireball.png");
         loadTexture("fireball_impact", "assets/projectile_assets/fireball_impact.png");
-
-        // Arrow
         loadTexture("arrow", "assets/projectile_assets/arrow.png");
         loadTexture("arrow_impact", "assets/projectile_assets/arrow_impact.png");
-
-        // Magic Bolt
         loadTexture("magic_bolt", "assets/projectile_assets/magic_bolt.png");
         loadTexture("magic_bolt_impact", "assets/projectile_assets/magic_bolt_impact.png");
 
@@ -214,29 +244,35 @@ public:
         const int ANIM_PLAYER_RUN = 0;
         const int ANIM_PLAYER_IDLE = 1;
         const int ANIM_PLAYER_ROLL = 2;
+        const int ANIM_PLAYER_MELEE = 3;
+        const int ANIM_PLAYER_RANGED = 4;
 
-        const int ANIM_ENEMY_IDLE = 0;
-        const int ANIM_ENEMY_RUN = 1;
-        const int ANIM_ENEMY_ATTACK = 2;
+        const int ANIM_BEAST_IDLE = 0;
+        const int ANIM_BEAST_RUN = 1;
+        const int ANIM_BEAST_ATTACK = 2;
+        const int ANIM_BEAST_DEATH = 3;
 
         std::vector<Animation> playerAnims;
-        std::vector<Animation> enemyAnims;
+        std::vector<Animation> beastAnims;
 
         playerAnims.resize(5);
-        enemyAnims.resize(5);
+        beastAnims.resize(5);
 
-        // Player animations
         playerAnims[ANIM_PLAYER_RUN] = Animation(15, 0.9f);
         playerAnims[ANIM_PLAYER_IDLE] = Animation(15, 0.9f);
         playerAnims[ANIM_PLAYER_ROLL] = Animation(15, 0.9f);
+        playerAnims[ANIM_PLAYER_MELEE] = Animation(15, 0.5f);
+        playerAnims[ANIM_PLAYER_RANGED] = Animation(15, 0.5f);
 
-        // Enemy animations (you can adjust frame counts and durations)
-        enemyAnims[ANIM_ENEMY_IDLE] = Animation(4, 0.6f);
-        enemyAnims[ANIM_ENEMY_RUN] = Animation(8, 0.8f);
-        enemyAnims[ANIM_ENEMY_ATTACK] = Animation(6, 0.5f);
+
+        // Enemy animations (8-directional, using sprite sheet frame counts)
+        beastAnims[ANIM_BEAST_IDLE] = Animation(20, 0.5f);
+        beastAnims[ANIM_BEAST_RUN] = Animation(20, 0.5f);
+        beastAnims[ANIM_BEAST_ATTACK] = Animation(24, 0.7f);
+        beastAnims[ANIM_BEAST_DEATH] = Animation(30, 0.5f);
 
         createAnimationSet("player", playerAnims);
-        createAnimationSet("enemy", enemyAnims);
+        createAnimationSet("beast", beastAnims);
     }
 
     void unloadAll() {

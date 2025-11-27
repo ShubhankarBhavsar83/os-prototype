@@ -4,70 +4,69 @@
 #include <iostream>
 
 // ============================================================================
-// DAMAGE TUNING SECTION - Adjust these values to control enemy difficulty
+// DAMAGE TUNING SECTION - Balanced for player combat
 // ============================================================================
 
-// Static method to get stats based on variant (NEW: Fine-grained control)
 EnemyStats EnemyStats::getStatsForVariant(EnemyVariant variant) {
     EnemyStats stats;
 
     switch (variant) {
     case EnemyVariant::BEAST_MELEE:
-        // TUNING: Beast - Fast, aggressive, lower HP
-        stats.maxHealth = 80.0f;        // Hits to kill: ~3-4 melee attacks
-        stats.attackDamage = 12.0f;     // Player damage taken per hit
+        // BALANCED: 2 melee hits (50 dmg each) OR 3 fireballs (33.33 dmg each) to kill
+        stats.maxHealth = 5000;
+        stats.attackDamage = 20.0f;     // Player takes 5 hits to die (100 HP / 20 dmg)
         stats.attackRange = 35.0f;
-        stats.attackCooldown = 1.0f;    // Attacks every 1 second
+        stats.attackCooldown = 1.0f;
         stats.detectionRange = 280.0f;
         stats.aggroRange = 200.0f;
-        stats.moveSpeed = 65.0f;        // Fast movement
+        stats.moveSpeed = 65.0f;
         stats.scale = 0.35f;
+        //texture = gs.getResourceManager().getTexture("player_ranged");
         break;
 
     case EnemyVariant::HALBERD_FIGHTER:
-        // TUNING: Halberd Fighter - Medium speed, high damage, longer reach
-        stats.maxHealth = 150.0f;       // Hits to kill: ~6 melee attacks
-        stats.attackDamage = 20.0f;     // Player damage taken per hit
-        stats.attackRange = 55.0f;      // Longer reach with halberd
-        stats.attackCooldown = 1.5f;    // Attacks every 1.5 seconds
+        // BALANCED: Same damage rules apply
+        stats.maxHealth = 10000.0f;
+        stats.attackDamage = 20.0f;
+        stats.attackRange = 55.0f;
+        stats.attackCooldown = 1.5f;
         stats.detectionRange = 250.0f;
         stats.aggroRange = 180.0f;
-        stats.moveSpeed = 45.0f;        // Medium movement
+        stats.moveSpeed = 45.0f;
         stats.scale = 0.4f;
         break;
 
     case EnemyVariant::BOSS_MELEE:
-        // TUNING: Boss - Slow, massive damage, tank HP
-        stats.maxHealth = 500.0f;       // Hits to kill: ~20 melee attacks
-        stats.attackDamage = 35.0f;     // Player damage taken per hit
+        // BALANCED: Same damage rules (tougher but predictable)
+        stats.maxHealth = 10000.0f;
+        stats.attackDamage = 20.0f;
         stats.attackRange = 60.0f;
-        stats.attackCooldown = 2.2f;    // Attacks every 2.2 seconds
+        stats.attackCooldown = 2.2f;
         stats.detectionRange = 350.0f;
         stats.aggroRange = 250.0f;
-        stats.moveSpeed = 30.0f;        // Slow movement
-        stats.scale = 0.6f;             // Larger sprite
+        stats.moveSpeed = 30.0f;
+        stats.scale = 0.6f;
         break;
     }
 
     return stats;
 }
 
-// Legacy method for backward compatibility
 EnemyStats EnemyStats::getStatsForType(EnemyAIType aiType, EnemyTier tier) {
     EnemyStats stats;
 
     switch (aiType) {
     case EnemyAIType::MELEE:
-        stats = { 100.0f, 15.0f, 40.0f, 1.2f, 250.0f, 180.0f, 40.0f, 0.3f };
+        stats = { 100.0f, 20.0f, 40.0f, 1.2f, 250.0f, 180.0f, 40.0f, 0.3f };
         break;
     case EnemyAIType::RANGED:
-        stats = { 70.0f, 10.0f, 150.0f, 2.0f, 300.0f, 200.0f, 30.0f, 0.3f };
+        stats = { 100.0f, 20.0f, 150.0f, 2.0f, 300.0f, 200.0f, 30.0f, 0.3f };
         break;
     case EnemyAIType::TANK:
-        stats = { 200.0f, 20.0f, 50.0f, 1.8f, 200.0f, 150.0f, 25.0f, 0.4f };
+        stats = { 100.0f, 20.0f, 50.0f, 1.8f, 200.0f, 150.0f, 25.0f, 0.4f };
         break;
     case EnemyAIType::FAST:
-        stats = { 50.0f, 8.0f, 30.0f, 0.8f, 280.0f, 200.0f, 60.0f, 0.25f };
+        stats = { 100.0f, 20.0f, 30.0f, 0.8f, 280.0f, 200.0f, 60.0f, 0.25f };
         break;
     }
 
@@ -100,8 +99,10 @@ EnemyNPC::EnemyNPC(EnemyAIType type, EnemyTier tier, EnemyVariant variant)
     retreatThreshold(20.0f), isAttacking(false),
     attackAnimDuration(0.5f), attackAnimTimer(0.0f),
     idleTexture(nullptr), walkTexture(nullptr), attackTexture(nullptr),
-    currentAnimFrame(0), animTimer(0.0f), animFrameDuration(0.1f),
-    idleFrameCount(4), walkFrameCount(8), attackFrameCount(6),
+    deathTexture(nullptr), currentAnimFrame(0), animTimer(0.0f),
+    animFrameDuration(0.1f), idleFrameCount(20), walkFrameCount(20),
+    attackFrameCount(25), deathFrameCount(25),
+    deathAnimTimer(0.0f), deathAnimDuration(2.5f), deathAnimComplete(false),
     isTargeted(false), targetPulseTimer(0.0f) {
 
     this->type = EntityType::ENEMY;
@@ -119,9 +120,9 @@ EnemyNPC::EnemyNPC(EnemyAIType type, EnemyTier tier, EnemyVariant variant)
     this->chaseSpeed = stats.moveSpeed;
     this->scale = stats.scale;
 
-    // Set sprite dimensions
-    this->spriteWidth = 128.0f;
-    this->spriteHeight = 128.0f;
+    // Set sprite dimensions (8-directional sprites)
+    this->spriteWidth = 180.0f;
+    this->spriteHeight = 180.0f;
 
     // Physics
     this->friction = 500.0f;
@@ -148,13 +149,36 @@ void EnemyNPC::loadTextures(ResourceManager& rm) {
     idleTexture = rm.getTexture(typePrefix + "_idle");
     walkTexture = rm.getTexture(typePrefix + "_walk");
     attackTexture = rm.getTexture(typePrefix + "_attack");
+    deathTexture = rm.getTexture(typePrefix + "_death");
 
     texture = idleTexture ? idleTexture : rm.getTexture("enemy_placeholder");
 }
 
 void EnemyNPC::update(float deltaTime, GameState& gs) {
-    if (health <= 0) {
-        state = EnemyState::DEAD;
+    // Death state handling
+    if (state == EnemyState::DYING) {
+        deathAnimTimer += deltaTime;
+        updateAnimation(deltaTime);
+
+        if (deathAnimTimer >= deathAnimDuration) {
+            state = EnemyState::DEAD;
+            active = false;  // Mark for cleanup
+        }
+        return;
+    }
+
+    if (health <= 0 && state != EnemyState::DYING) {
+        texture = gs.getResourceManager().getTexture("beast_death");
+
+        state = EnemyState::DYING;
+        deathAnimTimer = 0.0f;
+        currentAnimFrame = 0;
+        velocity = glm::vec2(0, 0);
+        playDeathAnimation();
+        return;
+    }
+
+    if (state == EnemyState::DEAD) {
         active = false;
         return;
     }
@@ -186,6 +210,8 @@ void EnemyNPC::updateAI(float deltaTime, GameState& gs) {
 
     switch (state) {
     case EnemyState::IDLE:
+        texture = gs.getResourceManager().getTexture("beast_idle");
+
         playIdleAnimation();
         if (distToPlayer < detectionRange) {
             state = EnemyState::CHASING;
@@ -194,10 +220,13 @@ void EnemyNPC::updateAI(float deltaTime, GameState& gs) {
         break;
 
     case EnemyState::CHASING:
+        texture = gs.getResourceManager().getTexture("beast_walk");
+
         playWalkAnimation();
 
         if (distToPlayer > detectionRange * 1.5f) {
             state = EnemyState::IDLE;
+
             velocity = glm::vec2(0, 0);
         }
         else if (distToPlayer <= attackRange) {
@@ -206,10 +235,15 @@ void EnemyNPC::updateAI(float deltaTime, GameState& gs) {
         else {
             glm::vec2 dir = glm::normalize(player->getPosition() - position);
             acceleration = dir * chaseSpeed * 10.0f;
+
+            // Update direction for animation
+            setDirection(dir.x, dir.y);
         }
         break;
 
     case EnemyState::ATTACKING:
+        texture = gs.getResourceManager().getTexture("beast_attack");
+
         playAttackAnimation();
         attackCooldown.step(deltaTime);
 
@@ -248,7 +282,7 @@ void EnemyNPC::performAttack(float deltaTime) {
         dirToTarget = glm::normalize(target->getPosition() - position);
     }
 
-    float hitboxSize = attackRange * 0.8f;
+    float hitboxSize = attackRange * 0.9f;
     attackHitbox = {
         position.x + dirToTarget.x * (attackRange * 0.5f) - hitboxSize / 2,
         position.y + dirToTarget.y * (attackRange * 0.5f) - hitboxSize / 2,
@@ -271,11 +305,12 @@ void EnemyNPC::patrol(float deltaTime) {
     else {
         glm::vec2 dir = glm::normalize(targetPos - position);
         acceleration = dir * (chaseSpeed * 0.5f) * 10.0f;
+        setDirection(dir.x, dir.y);
     }
 }
 
 // ============================================================================
-// ANIMATION SYSTEM
+// ANIMATION SYSTEM (8-Directional Support)
 // ============================================================================
 
 void EnemyNPC::updateAnimation(float deltaTime) {
@@ -285,14 +320,29 @@ void EnemyNPC::updateAnimation(float deltaTime) {
         animTimer = 0.0f;
 
         int maxFrames = idleFrameCount;
+
         if (state == EnemyState::CHASING || state == EnemyState::PATROLLING) {
             maxFrames = walkFrameCount;
         }
         else if (state == EnemyState::ATTACKING) {
             maxFrames = attackFrameCount;
         }
+        else if (state == EnemyState::DYING) {
+            maxFrames = deathFrameCount;
+
+            // Death animation plays once, don't loop
+            if (currentAnimFrame < maxFrames - 1) {
+                currentAnimFrame++;
+            }
+            return;
+        }
 
         currentAnimFrame = (currentAnimFrame + 1) % maxFrames;
+    }
+
+    // Update vertical sprite index based on direction
+    if (velocity.x != 0 || velocity.y != 0) {
+        verticalSpriteIndex = getDirectionIndex();
     }
 }
 
@@ -317,8 +367,16 @@ void EnemyNPC::playAttackAnimation() {
     }
 }
 
+void EnemyNPC::playDeathAnimation() {
+    if (texture != deathTexture && deathTexture) {
+        texture = deathTexture;
+        currentAnimFrame = 0;
+        animTimer = 0.0f;
+    }
+}
+
 // ============================================================================
-// RENDERING
+// RENDERING (8-Directional Sprite Support)
 // ============================================================================
 
 void EnemyNPC::render(SDL_Renderer* renderer, const SDL_FRect& viewport) {
@@ -341,9 +399,9 @@ void EnemyNPC::render(SDL_Renderer* renderer, const SDL_FRect& viewport) {
         SDL_RenderFillRect(renderer, &dst);
     }
     else {
-        // Calculate source rect for current animation frame
+        // Calculate source rect for current animation frame (8-directional)
         float srcX = currentAnimFrame * spriteWidth;
-        float srcY = 0.0f;
+        float srcY = verticalSpriteIndex * spriteHeight;  // Row based on direction
 
         SDL_FRect src = { srcX, srcY, spriteWidth, spriteHeight };
         SDL_FRect dst = {
@@ -355,14 +413,13 @@ void EnemyNPC::render(SDL_Renderer* renderer, const SDL_FRect& viewport) {
         SDL_RenderTexture(renderer, texture, &src, &dst);
     }
 
-    // Render target highlight if targeted
-    if (isTargeted) {
+    // Render target highlight if targeted (only when alive)
+    if (isTargeted && state != EnemyState::DYING && state != EnemyState::DEAD) {
         renderTargetHighlight(renderer, viewport);
     }
 }
 
 void EnemyNPC::renderTargetHighlight(SDL_Renderer* renderer, const SDL_FRect& viewport) {
-    // DOTA2-style target highlight: pulsing circle around enemy
     float pulseScale = 1.0f + 0.15f * sin(targetPulseTimer);
     float radius = (spriteWidth * scale * 0.6f) * pulseScale;
 
@@ -371,7 +428,6 @@ void EnemyNPC::renderTargetHighlight(SDL_Renderer* renderer, const SDL_FRect& vi
         position.y - viewport.y + (spriteHeight * scale) / 2
     };
 
-    // Draw pulsing circle
     SDL_SetRenderDrawColor(renderer, 255, 255, 0, 200);
 
     const int segments = 32;
@@ -387,7 +443,7 @@ void EnemyNPC::renderTargetHighlight(SDL_Renderer* renderer, const SDL_FRect& vi
         SDL_RenderLine(renderer, x1, y1, x2, y2);
     }
 
-    // Draw arrows pointing to target (4 cardinal directions)
+    // Draw arrows pointing to target
     float arrowDist = radius + 10.0f;
     float arrowSize = 8.0f;
 
@@ -396,7 +452,6 @@ void EnemyNPC::renderTargetHighlight(SDL_Renderer* renderer, const SDL_FRect& vi
         float arrowX = screenPos.x + cos(angle) * arrowDist;
         float arrowY = screenPos.y + sin(angle) * arrowDist;
 
-        // Simple arrow tip
         float tipX = arrowX + cos(angle) * arrowSize;
         float tipY = arrowY + sin(angle) * arrowSize;
         float left1X = arrowX + cos(angle + 2.5f) * arrowSize * 0.5f;
@@ -422,17 +477,26 @@ void EnemyNPC::onPlayerInteract(Player* player) {
 // ============================================================================
 
 void EnemyNPC::takeDamage(float damage) {
+    if (state == EnemyState::DYING || state == EnemyState::DEAD) return;
+
     health -= damage;
 
-    // TUNING: Retreat behavior (disable for bosses)
+    // Retreat behavior (disable for bosses)
     if (health <= maxHealth * (retreatThreshold / 100.0f) &&
         tier != EnemyTier::BOSS &&
-        variant != EnemyVariant::BOSS_MELEE) {
+        variant != EnemyVariant::BOSS_MELEE &&
+        health > 0) {
         state = EnemyState::RETREATING;
     }
 
     std::cout << "[Enemy] Took " << damage << " damage. HP: "
         << health << "/" << maxHealth << std::endl;
+
+    // Trigger death if HP reaches 0
+    if (health <= 0) {
+        health = 0;
+        std::cout << "[Enemy] Died!" << std::endl;
+    }
 }
 
 void EnemyNPC::attackTarget() {
@@ -440,5 +504,5 @@ void EnemyNPC::attackTarget() {
 }
 
 bool EnemyNPC::isDead() const {
-    return health <= 0;
+    return state == EnemyState::DEAD || health <= 0;
 }

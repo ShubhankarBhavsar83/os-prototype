@@ -65,6 +65,7 @@ add_executable (os-prototype-v2
     "application.cpp"
     "coordinateSystem.h"
     "portal.h"
+    "portal.cpp"           
     "uiManager.h"          
     "uiManager.cpp"        
     "movable.h" 

@@ -46,7 +46,6 @@ bool Application::initialize() {
     gameState = std::make_unique<GameState>(renderer, logicalWidth, logicalHeight);
     gameState->loadLevel();
 
-    // Update screen dimensions for all NPCs after loading
     updateNPCScreenDimensions();
 
     running = true;
@@ -81,7 +80,7 @@ void Application::processEvents() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
 
-        // 1. HANDLE ACTIVE CHAT (Priority handling)
+        // 1. HANDLE ACTIVE CHAT
         if (FriendlyNPC::activeChatNPC) {
             if (event.type == SDL_EVENT_TEXT_INPUT) {
                 std::cout << "[App] Text input received: " << event.text.text << std::endl;
@@ -92,20 +91,17 @@ void Application::processEvents() {
             if (event.type == SDL_EVENT_KEY_DOWN) {
                 std::cout << "[App] Key down in chat: " << SDL_GetKeyName(event.key.key) << std::endl;
 
-                // Only ESCAPE closes the chat
                 if (event.key.key == SDLK_ESCAPE) {
                     std::cout << "[App] Closing chat with ESC" << std::endl;
                     FriendlyNPC::activeChatNPC->endChat();
                     continue;
                 }
 
-                // Handle special keys (backspace, return)
                 if (event.key.key == SDLK_BACKSPACE || event.key.key == SDLK_RETURN) {
                     FriendlyNPC::activeChatNPC->handleKeyDown(event.key.key);
                     continue;
                 }
 
-                // Convert letter keys to text
                 if (event.key.key >= SDLK_A && event.key.key <= SDLK_Z) {
                     char c = (char)event.key.key;
                     std::string text(1, c);
@@ -113,7 +109,6 @@ void Application::processEvents() {
                     continue;
                 }
 
-                // Handle number keys (0-9)
                 if (event.key.key >= SDLK_0 && event.key.key <= SDLK_9) {
                     char c = (char)event.key.key;
                     std::string text(1, c);
@@ -121,13 +116,11 @@ void Application::processEvents() {
                     continue;
                 }
 
-                // Handle space
                 if (event.key.key == SDLK_SPACE) {
                     FriendlyNPC::activeChatNPC->handleTextInput(" ");
                     continue;
                 }
 
-                // Handle common punctuation and symbols
                 switch (event.key.key) {
                 case SDLK_PERIOD:       FriendlyNPC::activeChatNPC->handleTextInput("."); break;
                 case SDLK_COMMA:        FriendlyNPC::activeChatNPC->handleTextInput(","); break;
@@ -146,12 +139,12 @@ void Application::processEvents() {
             }
         }
 
-        // 2. HANDLE GAME INTERACTIONS (When NOT chatting)
+        // 2. HANDLE GAME INTERACTIONS
         if (event.type == SDL_EVENT_KEY_DOWN) {
             // E key - NPC interaction
             if (event.key.key == SDLK_E && !FriendlyNPC::activeChatNPC) {
                 Player* p = gameState->getPlayer();
-                if (p) {
+                if (p && !p->isDead()) {
                     FriendlyNPC* npc = gameState->findNearestFriendlyNPC(p->getPosition(), 70.0f);
                     if (npc) {
                         std::cout << "[App] E pressed - Starting chat with NPC" << std::endl;
@@ -163,12 +156,21 @@ void Application::processEvents() {
                 }
             }
 
-            // TAB key - Target cycling (NEW from old version)
+            // TAB key - Target cycling
             if (event.key.key == SDLK_TAB && !FriendlyNPC::activeChatNPC) {
                 Player* p = gameState->getPlayer();
-                if (p) {
+                if (p && !p->isDead()) {
                     p->cycleTarget(*gameState);
                     std::cout << "[App] Target cycled" << std::endl;
+                }
+            }
+
+            // NEW: Q key - Drop target
+            if (event.key.key == SDLK_Q && !FriendlyNPC::activeChatNPC) {
+                Player* p = gameState->getPlayer();
+                if (p && !p->isDead()) {
+                    p->dropTarget();
+                    std::cout << "[App] Target dropped" << std::endl;
                 }
             }
 
@@ -192,10 +194,11 @@ void Application::processEvents() {
 }
 
 void Application::update(float deltaTime) {
-    // Only move player if NOT chatting
     if (gameState->getMode() == GameStateMode::PLAYING && !FriendlyNPC::activeChatNPC) {
         Player* player = gameState->getPlayer();
-        if (player) player->handleInput(keyboardState, *gameState);
+        if (player && !player->isDead()) {
+            player->handleInput(keyboardState, *gameState);
+        }
     }
     gameState->update(deltaTime);
 }
@@ -206,7 +209,7 @@ void Application::render() {
     gameState->render(renderer);
 
     // ========================================================================
-    // DEBUG INFO - Left side (RESTORED from old version)
+    // DEBUG INFO - Left side
     // ========================================================================
     Player* player = gameState->getPlayer();
     if (player) {
@@ -226,24 +229,77 @@ void Application::render() {
         if (player->getTarget()) {
             SDL_RenderDebugText(renderer, 5, 50, "Target: Locked");
         }
+
+        // ====================================================================
+        // NEW: KEY MAPPINGS DISPLAY (Above HP bar)
+        // ====================================================================
+        SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+
+        // Position above the HP bar (HP bar is at y=280, so start at y=210)
+        int keyMapStartY = 130;
+        int lineHeight = 12;
+        int currentY = keyMapStartY;
+
+        SDL_RenderDebugText(renderer, 20, currentY, "=== CONTROLS ===");
+        currentY += lineHeight;
+
+        SDL_RenderDebugText(renderer, 20, currentY, "WASD: Move");
+        currentY += lineHeight;
+
+        SDL_RenderDebugText(renderer, 20, currentY, "L: Dash");
+        currentY += lineHeight;
+
+        SDL_RenderDebugText(renderer, 20, currentY, "K: Melee Attack");
+        currentY += lineHeight;
+
+        SDL_RenderDebugText(renderer, 20, currentY, "J: Fireball (need target)");
+        currentY += lineHeight;
+
+        SDL_RenderDebugText(renderer, 20, currentY, "TAB: Cycle Target");
+        currentY += lineHeight;
+
+        SDL_RenderDebugText(renderer, 20, currentY, "Q: Drop Target");
+        currentY += lineHeight;
+
+        SDL_RenderDebugText(renderer, 20, currentY, "E: Interact (NPC/Portal)");
+        currentY += lineHeight;
+
+        SDL_RenderDebugText(renderer, 20, currentY, "ESC: Pause");
     }
 
     // ========================================================================
-    // DEBUG INFO - Top Right (Enemy Health Display) (RESTORED from old version)
+    // DEATH MESSAGE
     // ========================================================================
-    if (player && player->getTarget()) {
+    if (player && player->isDead()) {
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+
+        // Large centered death message
+        int centerX = logicalWidth / 2 - 80;
+        int centerY = logicalHeight / 2 - 20;
+
+        SDL_SetRenderScale(renderer, 3.0f, 3.0f);
+        SDL_RenderDebugText(renderer, centerX / 3.0f, centerY / 3.0f, "YOU ARE DEAD");
+        SDL_SetRenderScale(renderer, 1.0f, 1.0f);
+
+        // Smaller instruction text
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL_RenderDebugText(renderer, centerX + 10, centerY + 40, "Game Over");
+    }
+
+    // ========================================================================
+    // DEBUG INFO - Top Right (Enemy Health Display)
+    // ========================================================================
+    if (player && player->getTarget() && !player->isDead()) {
         Entity* target = player->getTarget();
 
         if (target->getType() == EntityType::ENEMY) {
             EnemyNPC* enemy = static_cast<EnemyNPC*>(target);
 
-            // Position at top right corner
             int rightAlignX = logicalWidth - 150;
             int startY = 5;
 
             SDL_SetRenderDrawColor(renderer, 255, 255, 100, 255);
 
-            // Enemy type
             std::string variantStr;
             switch (enemy->getVariant()) {
             case EnemyVariant::BEAST_MELEE:
@@ -261,16 +317,15 @@ void Application::render() {
             SDL_RenderDebugText(renderer, rightAlignX, startY,
                 std::format("Target: {}", variantStr).c_str());
 
-            // HP display with color coding
             float hpPercent = enemy->getHealthPercent();
             if (hpPercent > 0.6f) {
-                SDL_SetRenderDrawColor(renderer, 255, 50, 50, 255); // Red (enemy color)
+                SDL_SetRenderDrawColor(renderer, 255, 50, 50, 255);
             }
             else if (hpPercent > 0.3f) {
-                SDL_SetRenderDrawColor(renderer, 255, 200, 0, 255); // Orange
+                SDL_SetRenderDrawColor(renderer, 255, 200, 0, 255);
             }
             else {
-                SDL_SetRenderDrawColor(renderer, 255, 100, 100, 255); // Light red (low HP)
+                SDL_SetRenderDrawColor(renderer, 255, 100, 100, 255);
             }
 
             std::string enemyHPStr = std::format("HP: {:.0f}/{:.0f}",
@@ -283,7 +338,6 @@ void Application::render() {
             int barX = rightAlignX;
             int barY = startY + 30;
 
-            // Background
             SDL_SetRenderDrawColor(renderer, 40, 40, 40, 200);
             SDL_FRect bgRect = {
                 static_cast<float>(barX),
@@ -293,7 +347,6 @@ void Application::render() {
             };
             SDL_RenderFillRect(renderer, &bgRect);
 
-            // HP Fill
             SDL_FRect fillRect = {
                 static_cast<float>(barX),
                 static_cast<float>(barY),
@@ -312,7 +365,6 @@ void Application::render() {
             }
             SDL_RenderFillRect(renderer, &fillRect);
 
-            // Border
             SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
             SDL_RenderRect(renderer, &bgRect);
         }
@@ -324,18 +376,15 @@ void Application::render() {
 void Application::handleWindowResize(int width, int height) {
     screenWidth = width;
     screenHeight = height;
-
-    // Update screen dimensions for all NPCs when window is resized
     updateNPCScreenDimensions();
 }
 
 void Application::updateNPCScreenDimensions() {
     if (!gameState) return;
 
-    // Get all entities in the characters layer and update FriendlyNPCs
     std::vector<Entity*> entities = gameState->getEntitiesInRange(
         glm::vec2(0, 0),
-        100000.0f,  // Large range to get all entities
+        100000.0f,
         LAYER_IDX_CHARACTERS
     );
 

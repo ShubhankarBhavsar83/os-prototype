@@ -30,7 +30,7 @@ private:
     Timer impactAnimTimer;
     bool hasHit;
 
-    // NEW: Animation system
+    // Animation system (8-directional)
     SDL_Texture* projectileTexture;
     SDL_Texture* impactTexture;
     int currentAnimFrame;
@@ -47,11 +47,12 @@ public:
     void handleCollision(Entity* other) override;
 
     void setTarget(Entity* target);
+    void setDamage(float dmg) { damage = dmg; }  // NEW: Damage setter
     void launch(const glm::vec2& direction);
     void onImpact(Entity* hitEntity);
     bool shouldRemove() const;
 
-    // NEW: Animation and texture loading
+    // Animation and texture loading
     void updateAnimation(float deltaTime);
     void loadTextures(class ResourceManager& rm);
 };

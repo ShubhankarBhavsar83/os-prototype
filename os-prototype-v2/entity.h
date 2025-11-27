@@ -32,8 +32,7 @@ protected:
     float base_acceleration;
     float base_deceleration;
 
-    float spriteWidth;
-    float spriteHeight;
+
 
     bool solid;
     bool active;
@@ -47,6 +46,8 @@ public:
     float scale;
     SDL_Texture* texture;
     std::vector<Animation> animations;
+    float spriteWidth;
+    float spriteHeight;
 
     Entity()
         : type(EntityType::LEVEL_TILE), id(0), currentLayer(0),

@@ -8,6 +8,7 @@ enum class EnemyState {
     CHASING,
     ATTACKING,
     RETREATING,
+    DYING,      // NEW: Death animation state
     DEAD
 };
 
@@ -18,21 +19,18 @@ enum class EnemyAIType {
     FAST
 };
 
-// NEW: Enemy tier classification
 enum class EnemyTier {
     TRASH_MOB,
     ELITE,
     BOSS
 };
 
-// NEW: Specific enemy types for damage tuning
 enum class EnemyVariant {
-    BEAST_MELEE,        // Fast, moderate damage
-    HALBERD_FIGHTER,    // Medium speed, high damage
-    BOSS_MELEE          // Slow, very high damage
+    BEAST_MELEE,
+    HALBERD_FIGHTER,
+    BOSS_MELEE
 };
 
-// NEW: Enemy stats struct for different types
 struct EnemyStats {
     float maxHealth;
     float attackDamage;
@@ -44,7 +42,7 @@ struct EnemyStats {
     float scale;
 
     static EnemyStats getStatsForType(EnemyAIType aiType, EnemyTier tier);
-    static EnemyStats getStatsForVariant(EnemyVariant variant); // NEW: Variant-specific stats
+    static EnemyStats getStatsForVariant(EnemyVariant variant);
 };
 
 class EnemyNPC : public NPC {
@@ -52,7 +50,7 @@ private:
     EnemyState state;
     EnemyAIType aiType;
     EnemyTier tier;
-    EnemyVariant variant; // NEW: Specific enemy type
+    EnemyVariant variant;
 
     // Combat stats
     float health;
@@ -67,27 +65,34 @@ private:
     float chaseSpeed;
     float retreatThreshold;
 
-    // NEW: Texture management for animations
+    // Texture management for animations
     std::string textureKey;
     SDL_Texture* idleTexture;
     SDL_Texture* walkTexture;
     SDL_Texture* attackTexture;
+    SDL_Texture* deathTexture;  // NEW: Death animation texture
 
-    // NEW: Animation state
+    // Animation state
     int currentAnimFrame;
     float animTimer;
     float animFrameDuration;
     int idleFrameCount;
     int walkFrameCount;
     int attackFrameCount;
+    int deathFrameCount;        // NEW: Death frame count
 
-    // NEW: Attack hitbox
+    // NEW: Death animation timing
+    float deathAnimTimer;
+    float deathAnimDuration;
+    bool deathAnimComplete;
+
+    // Attack hitbox
     SDL_FRect attackHitbox;
     bool isAttacking;
     float attackAnimDuration;
     float attackAnimTimer;
 
-    // NEW: Target highlight
+    // Target highlight
     bool isTargeted;
     float targetPulseTimer;
 
@@ -113,17 +118,18 @@ public:
     void performAttack(float deltaTime);
     void retreat(float deltaTime);
 
-    // NEW: Animation system
+    // Animation system
     void updateAnimation(float deltaTime);
     void playIdleAnimation();
     void playWalkAnimation();
     void playAttackAnimation();
+    void playDeathAnimation();      // NEW: Death animation
 
-    // NEW: Texture loading
+    // Texture loading
     void loadTextures(class ResourceManager& rm);
     SDL_FRect getAttackHitbox() const;
 
-    // NEW: Targeting visual
+    // Targeting visual
     void setTargeted(bool targeted) { isTargeted = targeted; }
     bool getTargeted() const { return isTargeted; }
     void renderTargetHighlight(SDL_Renderer* renderer, const SDL_FRect& viewport);
@@ -136,4 +142,5 @@ public:
     float getMaxHealth() const { return maxHealth; }
     float getAttackDamage() const { return attackDamage; }
     bool isCurrentlyAttacking() const { return isAttacking; }
+    EnemyState getState() const { return state; }  // NEW: State getter
 };
