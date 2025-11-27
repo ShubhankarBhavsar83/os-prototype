@@ -1,7 +1,9 @@
 #include "Application.h"
 #include "FriendlyNpc.h"
 #include "GameState.h"
+#include "EnemyNpc.h"
 #include <iostream>
+#include <format>
 
 Application::Application()
     : window(nullptr), renderer(nullptr), running(false),
@@ -145,9 +147,9 @@ void Application::processEvents() {
         }
 
         // 2. HANDLE GAME INTERACTIONS (When NOT chatting)
-        if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_E) {
-            if (!FriendlyNPC::activeChatNPC) {
-                // Only open chat if not already chatting
+        if (event.type == SDL_EVENT_KEY_DOWN) {
+            // E key - NPC interaction
+            if (event.key.key == SDLK_E && !FriendlyNPC::activeChatNPC) {
                 Player* p = gameState->getPlayer();
                 if (p) {
                     FriendlyNPC* npc = gameState->findNearestFriendlyNPC(p->getPosition(), 70.0f);
@@ -160,7 +162,21 @@ void Application::processEvents() {
                     }
                 }
             }
-            // If already chatting, the E key was already handled above and won't reach here
+
+            // TAB key - Target cycling (NEW from old version)
+            if (event.key.key == SDLK_TAB && !FriendlyNPC::activeChatNPC) {
+                Player* p = gameState->getPlayer();
+                if (p) {
+                    p->cycleTarget(*gameState);
+                    std::cout << "[App] Target cycled" << std::endl;
+                }
+            }
+
+            // ESC key - Pause game
+            if (event.key.key == SDLK_ESCAPE && !FriendlyNPC::activeChatNPC) {
+                gameState->setMode(GameStateMode::PAUSED);
+                std::cout << "[App] Game Paused" << std::endl;
+            }
         }
 
         // 3. HANDLE WINDOW EVENTS
@@ -188,6 +204,120 @@ void Application::render() {
     SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
     SDL_RenderClear(renderer);
     gameState->render(renderer);
+
+    // ========================================================================
+    // DEBUG INFO - Left side (RESTORED from old version)
+    // ========================================================================
+    Player* player = gameState->getPlayer();
+    if (player) {
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+
+        std::string stateStr = std::format("State: {}", static_cast<int>(player->getState()));
+        SDL_RenderDebugText(renderer, 5, 5, stateStr.c_str());
+
+        glm::vec2 pos = player->getPosition();
+        std::string posStr = std::format("Pos: ({:.1f}, {:.1f})", pos.x, pos.y);
+        SDL_RenderDebugText(renderer, 5, 20, posStr.c_str());
+
+        std::string hpStr = std::format("HP: {:.0f}/{:.0f}",
+            player->getHealth(), player->getMaxHealth());
+        SDL_RenderDebugText(renderer, 5, 35, hpStr.c_str());
+
+        if (player->getTarget()) {
+            SDL_RenderDebugText(renderer, 5, 50, "Target: Locked");
+        }
+    }
+
+    // ========================================================================
+    // DEBUG INFO - Top Right (Enemy Health Display) (RESTORED from old version)
+    // ========================================================================
+    if (player && player->getTarget()) {
+        Entity* target = player->getTarget();
+
+        if (target->getType() == EntityType::ENEMY) {
+            EnemyNPC* enemy = static_cast<EnemyNPC*>(target);
+
+            // Position at top right corner
+            int rightAlignX = logicalWidth - 150;
+            int startY = 5;
+
+            SDL_SetRenderDrawColor(renderer, 255, 255, 100, 255);
+
+            // Enemy type
+            std::string variantStr;
+            switch (enemy->getVariant()) {
+            case EnemyVariant::BEAST_MELEE:
+                variantStr = "Beast";
+                break;
+            case EnemyVariant::HALBERD_FIGHTER:
+                variantStr = "Halberd Fighter";
+                break;
+            case EnemyVariant::BOSS_MELEE:
+                variantStr = "BOSS";
+                SDL_SetRenderDrawColor(renderer, 255, 50, 50, 255);
+                break;
+            }
+
+            SDL_RenderDebugText(renderer, rightAlignX, startY,
+                std::format("Target: {}", variantStr).c_str());
+
+            // HP display with color coding
+            float hpPercent = enemy->getHealthPercent();
+            if (hpPercent > 0.6f) {
+                SDL_SetRenderDrawColor(renderer, 255, 50, 50, 255); // Red (enemy color)
+            }
+            else if (hpPercent > 0.3f) {
+                SDL_SetRenderDrawColor(renderer, 255, 200, 0, 255); // Orange
+            }
+            else {
+                SDL_SetRenderDrawColor(renderer, 255, 100, 100, 255); // Light red (low HP)
+            }
+
+            std::string enemyHPStr = std::format("HP: {:.0f}/{:.0f}",
+                enemy->getHealth(), enemy->getMaxHealth());
+            SDL_RenderDebugText(renderer, rightAlignX, startY + 15, enemyHPStr.c_str());
+
+            // HP bar visualization
+            int barWidth = 140;
+            int barHeight = 8;
+            int barX = rightAlignX;
+            int barY = startY + 30;
+
+            // Background
+            SDL_SetRenderDrawColor(renderer, 40, 40, 40, 200);
+            SDL_FRect bgRect = {
+                static_cast<float>(barX),
+                static_cast<float>(barY),
+                static_cast<float>(barWidth),
+                static_cast<float>(barHeight)
+            };
+            SDL_RenderFillRect(renderer, &bgRect);
+
+            // HP Fill
+            SDL_FRect fillRect = {
+                static_cast<float>(barX),
+                static_cast<float>(barY),
+                static_cast<float>(barWidth) * hpPercent,
+                static_cast<float>(barHeight)
+            };
+
+            if (hpPercent > 0.6f) {
+                SDL_SetRenderDrawColor(renderer, 255, 50, 50, 255);
+            }
+            else if (hpPercent > 0.3f) {
+                SDL_SetRenderDrawColor(renderer, 255, 150, 0, 255);
+            }
+            else {
+                SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+            }
+            SDL_RenderFillRect(renderer, &fillRect);
+
+            // Border
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+            SDL_RenderRect(renderer, &bgRect);
+        }
+    }
+
     SDL_RenderPresent(renderer);
 }
 

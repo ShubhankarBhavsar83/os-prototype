@@ -1,19 +1,23 @@
 #pragma once
 #include "Entity.h"
+#include "Player.h"
 
 class Furniture : public Entity {
+private:
+    bool layerManagement;
+
 public:
-    Furniture() : Entity() {
+    Furniture() : Entity(), layerManagement(true) {
         type = EntityType::FURNITURE;
-        solid = false;
+        solid = true;
         spriteWidth = 32.0f;
         spriteHeight = 32.0f;
         scale = 1.0f;
-
-        collider = Collider(6.0f, 7.0f, 3.0f, 2.0f, false);
+        collider = Collider(0.0f, 0.0f, 0.0f, 0.0f, true);
     }
 
-    void update(float deltaTime, GameState& gs) override;
+    void update(float deltaTime, class GameState& gs) override;
+    void updateLayer(const glm::vec2& playerPos, class GameState& gs);
 
     void render(SDL_Renderer* renderer, const SDL_FRect& viewport) override {
         if (!texture) return;
@@ -29,8 +33,8 @@ public:
     }
 
     void handleCollision(Entity* other) override {
-        // Furniture is passive
+        // Furniture is static - no collision response
     }
 
-    void updateLayer(const glm::vec2& playerPos, GameState& gs);
+    void setLayerManagement(bool enabled) { layerManagement = enabled; }
 };

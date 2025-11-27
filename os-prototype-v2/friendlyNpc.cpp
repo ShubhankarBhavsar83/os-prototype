@@ -1,88 +1,101 @@
 #include "FriendlyNpc.h"
 #include "GameState.h"
-#include "CoordinateSystem.h"
+#include "Player.h"
 #include <iostream>
 
+// Static member for tracking active chat
 FriendlyNPC* FriendlyNPC::activeChatNPC = nullptr;
 
+// Global API client
 static APIClient globalApiClient;
 
 FriendlyNPC::FriendlyNPC()
-    : NPC(NPCType::FRIENDLY), isWaitingForResponse(false),
-    currentInput(""), lastResponse("Hello! Press E to chat."),
-    characterName("elara"), playerID("001") {
+    : NPC(NPCType::FRIENDLY),
+    isWaitingForResponse(false),
+    characterName("elara"),
+    playerID("001") {
 
     this->type = EntityType::FRIENDLY_NPC;
     this->solid = true;
     this->spriteWidth = 32.0f;
     this->spriteHeight = 32.0f;
+    this->scale = 1.0f;
     this->friction = 900.0f;
 
+    // Initialize global API client once
     static bool apiStarted = false;
     if (!apiStarted) {
         globalApiClient.start();
         apiStarted = true;
     }
 
-    chatSystem.setMessageCallback([this](const std::string& msg) {
-        this->sendToAPI(msg);
+    // Set up the chat system with callback
+    chatSystem.setMessageCallback([this](const std::string& message) {
+        this->sendToAPI(message);
         });
 
+    // Add initial greeting message
     chatSystem.addMessage("NPC", "Hello! Press E to chat.");
 
-    std::cout << "[FriendlyNPC] Created NPC at " << this << std::endl;
+    std::cout << "[FriendlyNPC] Created with character: " << characterName << std::endl;
 }
 
 FriendlyNPC::~FriendlyNPC() {
+    std::cout << "[FriendlyNPC] Destructor called" << std::endl;
+
+    // If this NPC was the active chat, clear it
     if (activeChatNPC == this) {
+        std::cout << "[FriendlyNPC] Clearing active chat NPC" << std::endl;
         activeChatNPC = nullptr;
     }
-    std::cout << "[FriendlyNPC] Destroyed NPC at " << this << std::endl;
 }
 
 void FriendlyNPC::update(float deltaTime, GameState& gs) {
-    applyMovement(deltaTime, 75.0f, 75.0f);
+    // Physics
+    applyMovement(deltaTime, maxSpeedX, maxSpeedY);
 }
 
 void FriendlyNPC::render(SDL_Renderer* renderer, const SDL_FRect& viewport) {
-    // Render NPC sprite
-    SDL_FRect dst = {
-        position.x - viewport.x,
-        position.y - viewport.y,
-        spriteWidth * scale,
-        spriteHeight * scale
-    };
-
-    if (texture) {
-        SDL_RenderTexture(renderer, texture, nullptr, &dst);
-    }
-    else {
-        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    // Green rectangle fallback
+    if (!texture) {
+        SDL_SetRenderDrawColor(renderer, 50, 200, 50, 255);
+        SDL_FRect dst = {
+            position.x - viewport.x,
+            position.y - viewport.y,
+            spriteWidth * scale,
+            spriteHeight * scale
+        };
         SDL_RenderFillRect(renderer, &dst);
     }
+    else {
+        SDL_FRect dst = {
+            position.x - viewport.x,
+            position.y - viewport.y,
+            spriteWidth * scale,
+            spriteHeight * scale
+        };
+        SDL_RenderTexture(renderer, texture, nullptr, &dst);
+    }
 
-    // Render chat system if active
+    // Render chat UI if this NPC's chat is active
     if (chatSystem.isActive()) {
         chatSystem.render(renderer);
     }
 }
 
 void FriendlyNPC::onPlayerInteract(Player* player) {
-    std::cout << "[FriendlyNPC] onPlayerInteract called! Chat active: " << chatSystem.isActive() << std::endl;
-
     if (!chatSystem.isActive()) {
-        std::cout << "[FriendlyNPC] Starting chat..." << std::endl;
         startChat();
     }
     else {
-        std::cout << "[FriendlyNPC] Ending chat..." << std::endl;
         endChat();
     }
 }
 
 void FriendlyNPC::startChat() {
-    std::cout << "[FriendlyNPC] startChat() called" << std::endl;
+    std::cout << "[FriendlyNPC] Starting chat..." << std::endl;
 
+    // Close any other active chat
     if (activeChatNPC && activeChatNPC != this) {
         std::cout << "[FriendlyNPC] Closing previous NPC's chat" << std::endl;
         activeChatNPC->endChat();
@@ -91,30 +104,37 @@ void FriendlyNPC::startChat() {
     activeChatNPC = this;
     chatSystem.activate();
 
-    std::cout << "[FriendlyNPC] Chat system activated. Is active: " << chatSystem.isActive() << std::endl;
+    std::cout << "[FriendlyNPC] Chat started. Active NPC: " << this << std::endl;
 }
 
 void FriendlyNPC::endChat() {
-    std::cout << "[FriendlyNPC] endChat() called" << std::endl;
+    std::cout << "[FriendlyNPC] Ending chat..." << std::endl;
+
     chatSystem.deactivate();
+
+    // Only clear if we're still the active NPC
     if (activeChatNPC == this) {
         activeChatNPC = nullptr;
-        std::cout << "[FriendlyNPC] Cleared activeChatNPC" << std::endl;
     }
+
+    std::cout << "[FriendlyNPC] Chat ended." << std::endl;
 }
 
 void FriendlyNPC::handleTextInput(const std::string& text) {
-    std::cout << "[FriendlyNPC] handleTextInput: '" << text << "'" << std::endl;
     chatSystem.handleTextInput(text);
 }
 
 void FriendlyNPC::handleKeyDown(SDL_Keycode key) {
-    std::cout << "[FriendlyNPC] handleKeyDown: " << SDL_GetKeyName(key) << std::endl;
     chatSystem.handleKeyPress(key);
 }
 
 void FriendlyNPC::sendToAPI(const std::string& message) {
-    std::cout << "[FriendlyNPC] Sending to API: " << message << std::endl;
+    if (isWaitingForResponse) {
+        std::cout << "[FriendlyNPC] Already waiting for response, ignoring new message" << std::endl;
+        return;
+    }
+
+    std::cout << "[FriendlyNPC] Sending message to API: " << message << std::endl;
 
     // Escape quotes in the message
     std::string escapedMessage = message;
@@ -124,15 +144,23 @@ void FriendlyNPC::sendToAPI(const std::string& message) {
         pos += 2;
     }
 
+    // Build JSON payload with proper formatting
     std::string payload = "{ \"characterName\":\"" + characterName +
         "\", \"context\":\"" + escapedMessage +
         "\", \"playerID\":\"" + playerID + "\" }";
 
     std::cout << "[FriendlyNPC] JSON Payload: " << payload << std::endl;
 
-    globalApiClient.sendRequest(n8nWebhookUrl, payload, [this](const std::string& response) {
-        this->onAPIResponse(response);
-        });
+    isWaitingForResponse = true;
+    chatSystem.setWaitingForResponse(true);
+
+    globalApiClient.sendRequest(
+        n8nWebhookUrl,
+        payload,
+        [this](const std::string& response) {
+            this->onAPIResponse(response);
+        }
+    );
 }
 
 void FriendlyNPC::onAPIResponse(const std::string& response) {
@@ -226,11 +254,16 @@ void FriendlyNPC::onAPIResponse(const std::string& response) {
     std::cout << "[FriendlyNPC] ============ FINAL OUTPUT ============" << std::endl;
     std::cout << "[FriendlyNPC] Cleaned Response: '" << cleanedResponse << "'" << std::endl;
     std::cout << "[FriendlyNPC] Cleaned length: " << cleanedResponse.length() << std::endl;
-    std::cout << "[FriendlyNPC] First char ASCII: " << (int)cleanedResponse[0] << " ('" << cleanedResponse[0] << "')" << std::endl;
+    if (!cleanedResponse.empty()) {
+        std::cout << "[FriendlyNPC] First char ASCII: " << (int)cleanedResponse[0] << " ('" << cleanedResponse[0] << "')" << std::endl;
+    }
     std::cout << "[FriendlyNPC] =====================================" << std::endl;
 
-    chatSystem.addMessage(characterName, cleanedResponse);
+    isWaitingForResponse = false;
     chatSystem.setWaitingForResponse(false);
+    chatSystem.addMessage(characterName, cleanedResponse);
+
+    lastResponse = cleanedResponse;
 }
 
 void FriendlyNPC::setScreenDimensions(int width, int height) {

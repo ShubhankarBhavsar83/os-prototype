@@ -131,7 +131,6 @@ EnemyNPC::EnemyNPC(EnemyAIType type, EnemyTier tier, EnemyVariant variant)
     // Collision
     this->collider = Collider(20.0f * scale, 20.0f * scale, 30.0f * scale, 10.0f * scale, true);
 
-
     // Initialize patrol points
     patrolPoints.push_back(glm::vec2(0, 0));
 }

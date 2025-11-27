@@ -68,8 +68,27 @@ void Projectile::update(float deltaTime, GameState& gs) {
 
     switch (state) {
     case ProjectileState::MOVING: {
-        // Apply homing if we have a target
-        if (target && target->isActive() && homingStrength > 0.0f) {
+        // CRITICAL FIX: Validate target before accessing it
+        // Check if target is null, inactive, or an enemy that's dead
+        bool targetValid = false;
+        if (target && target->isActive()) {
+            // Additional check for enemy targets - make sure they're not dead
+            if (target->getType() == EntityType::ENEMY) {
+                EnemyNPC* enemyTarget = static_cast<EnemyNPC*>(target);
+                targetValid = !enemyTarget->isDead();
+            }
+            else {
+                targetValid = true;
+            }
+        }
+
+        // Clear invalid targets
+        if (!targetValid) {
+            target = nullptr;
+        }
+
+        // Apply homing if we have a valid target
+        if (target && homingStrength > 0.0f) {
             glm::vec2 toTarget = target->getPosition() - position;
             float distToTarget = glm::length(toTarget);
 
@@ -250,6 +269,9 @@ void Projectile::render(SDL_Renderer* renderer, const SDL_FRect& viewport) {
 void Projectile::handleCollision(Entity* other) {
     if (hasHit || !other || other == owner) return;
 
+    // SAFETY CHECK: Validate entity before accessing
+    if (!other->isActive()) return;
+
     // Only collide with enemies if shot by player, or player if shot by enemy
     bool shouldCollide = false;
 
@@ -266,6 +288,9 @@ void Projectile::handleCollision(Entity* other) {
 }
 
 void Projectile::onImpact(Entity* hitEntity) {
+    // SAFETY CHECK: Validate entity
+    if (!hitEntity || !hitEntity->isActive()) return;
+
     hasHit = true;
     state = ProjectileState::IMPACTING;
     velocity = glm::vec2(0, 0);

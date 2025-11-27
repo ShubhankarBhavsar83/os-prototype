@@ -148,11 +148,11 @@ void ChatSystem::calculateMessageHeights() {
             display.c_str(),
             display.length(),
             { 255, 255, 255, 255 },
-            (int)(chatBoxRect.w - 20)
+            static_cast<int>(chatBoxRect.w - 20)
         );
 
         if (surf) {
-            messageHeights.push_back((float)surf->h + 5.0f);
+            messageHeights.push_back(static_cast<float>(surf->h) + 5.0f);
             SDL_DestroySurface(surf);
         }
         else {
@@ -225,18 +225,18 @@ void ChatSystem::render(SDL_Renderer* renderer) {
 
     // Set clip rect for messages
     SDL_Rect clipRect = {
-        (int)chatBoxRect.x,
-        (int)chatBoxRect.y,
-        (int)chatBoxRect.w,
-        (int)chatBoxRect.h
+        static_cast<int>(chatBoxRect.x),
+        static_cast<int>(chatBoxRect.y),
+        static_cast<int>(chatBoxRect.w),
+        static_cast<int>(chatBoxRect.h)
     };
     SDL_SetRenderClipRect(renderer, &clipRect);
 
     // Render messages from bottom up
     float currentY = chatBoxRect.y + chatBoxRect.h - 10;
 
-    for (int i = (int)messages.size() - 1; i >= 0; i--) {
-        if (i >= (int)messageHeights.size()) continue;
+    for (int i = static_cast<int>(messages.size()) - 1; i >= 0; i--) {
+        if (i >= static_cast<int>(messageHeights.size())) continue;
 
         float msgHeight = messageHeights[i];
         currentY -= msgHeight;
@@ -264,9 +264,9 @@ void ChatSystem::render(SDL_Renderer* renderer) {
             // Draw background for indicator
             SDL_FRect bgRect = {
                 chatBoxRect.x + 5,
-                chatBoxRect.y + chatBoxRect.h - (float)surf->h - 10.0f,
-                (float)surf->w + 10.0f,
-                (float)surf->h + 5.0f
+                chatBoxRect.y + chatBoxRect.h - static_cast<float>(surf->h) - 10.0f,
+                static_cast<float>(surf->w) + 10.0f,
+                static_cast<float>(surf->h) + 5.0f
             };
             SDL_SetRenderDrawColor(renderer, 60, 60, 40, 200);
             SDL_RenderFillRect(renderer, &bgRect);
@@ -275,9 +275,9 @@ void ChatSystem::render(SDL_Renderer* renderer) {
             if (tex) {
                 SDL_FRect dst = {
                     chatBoxRect.x + 10,
-                    chatBoxRect.y + chatBoxRect.h - (float)surf->h - 7.5f,
-                    (float)surf->w,
-                    (float)surf->h
+                    chatBoxRect.y + chatBoxRect.h - static_cast<float>(surf->h) - 7.5f,
+                    static_cast<float>(surf->w),
+                    static_cast<float>(surf->h)
                 };
                 SDL_RenderTexture(renderer, tex, nullptr, &dst);
                 SDL_DestroyTexture(tex);
@@ -317,7 +317,7 @@ float ChatSystem::renderMessage(SDL_Renderer* renderer, const ChatMessage& msg, 
             display.c_str(),
             display.length(),
             color,
-            (int)(chatBoxRect.w - 20)
+            static_cast<int>(chatBoxRect.w - 20)
         );
     }
     catch (...) {
@@ -332,11 +332,11 @@ float ChatSystem::renderMessage(SDL_Renderer* renderer, const ChatMessage& msg, 
             SDL_FRect dst = {
                 chatBoxRect.x + 10,
                 yOffset,
-                (float)surf->w,
-                (float)surf->h
+                static_cast<float>(surf->w),
+                static_cast<float>(surf->h)
             };
             SDL_RenderTexture(renderer, tex, nullptr, &dst);
-            messageHeight = (float)surf->h;
+            messageHeight = static_cast<float>(surf->h);
             SDL_DestroyTexture(tex);
         }
         SDL_DestroySurface(surf);
@@ -377,8 +377,8 @@ void ChatSystem::renderInputBox(SDL_Renderer* renderer) {
     if (surf) {
         SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surf);
         if (tex) {
-            float textW = (float)surf->w;
-            float textH = (float)surf->h;
+            float textW = static_cast<float>(surf->w);
+            float textH = static_cast<float>(surf->h);
 
             SDL_FRect visibleArea = {
                 inputBoxRect.x + 5,
@@ -408,10 +408,10 @@ void ChatSystem::renderInputBox(SDL_Renderer* renderer) {
             }
 
             SDL_Rect inputClip = {
-                (int)inputBoxRect.x,
-                (int)inputBoxRect.y,
-                (int)inputBoxRect.w,
-                (int)inputBoxRect.h
+                static_cast<int>(inputBoxRect.x),
+                static_cast<int>(inputBoxRect.y),
+                static_cast<int>(inputBoxRect.w),
+                static_cast<int>(inputBoxRect.h)
             };
             SDL_SetRenderClipRect(renderer, &inputClip);
 
