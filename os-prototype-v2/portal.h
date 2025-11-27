@@ -21,7 +21,7 @@ public:
         spriteWidth = 32.0f;
         spriteHeight = 32.0f;
         scale = 1.0f;
-        collider = Collider(5.0f, 5.0f, 5.0f, 5.0f);
+        collider = Collider(0.0f, 0.0f, 0.0f, 0.0f, false);
     }
 
     void update(float deltaTime, GameState& gs) override {

@@ -4,6 +4,8 @@
 #include <thread>
 #include <queue>
 #include <mutex>
+#include <vector>
+#include "ChatSystem.h" // Needed for ChatMessage
 
 struct APIRequest {
     std::string endpoint;

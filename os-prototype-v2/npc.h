@@ -1,30 +1,35 @@
 #pragma once
 #include "Movable.h"
-#include "Timer.h"
 
 enum class NPCType {
     FRIENDLY,
-    HOSTILE
+    HOSTILE,
+    NEUTRAL
 };
 
 class NPC : public Movable {
 protected:
     NPCType npcType;
-    std::string name;
+    Entity* target;
     float detectionRange;
     float aggroRange;
-    Entity* target;
-    Timer idleTimer;
-    Timer actionTimer;
 
 public:
-    NPC(NPCType type);
+    NPC(NPCType type)
+        : Movable(), npcType(type), target(nullptr),
+        detectionRange(200.0f), aggroRange(150.0f) {
+    }
+
     virtual ~NPC() = default;
 
-    virtual void update(float deltaTime, class GameState& gs) override = 0;
+    // Pure virtual function - must be implemented by derived classes
     virtual void onPlayerInteract(class Player* player) = 0;
 
-    NPCType getNPCType() const;
-    void setTarget(Entity* newTarget);
-    Entity* getTarget() const;
-};  
+    // Moved from protected to public accessors
+    void setTarget(Entity* newTarget) { target = newTarget; }
+    Entity* getTarget() const { return target; }
+
+    NPCType getNPCType() const { return npcType; }
+    float getDetectionRange() const { return detectionRange; }
+    float getAggroRange() const { return aggroRange; }
+};

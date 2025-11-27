@@ -9,6 +9,9 @@
 #include "ResourceManager.h"
 #include "UIManager.h"
 
+// Forward declaration to avoid circular includes
+class FriendlyNPC;
+
 // Layer indices
 const size_t LAYER_IDX_LEVEL = 0;
 const size_t LAYER_IDX_FURNITURE_BACKGROUND = 1;
@@ -68,12 +71,16 @@ public:
     std::vector<Entity*> getEnemiesInRange(const glm::vec2& pos, float range);
 
     // Level management
-    void loadLevel(const std::string& levelName = "abyss");
+    void loadLevel();
+    void loadLevel(const std::string& levelName);
     void transitionToLevel(const std::string& levelName);
     void clearLevel();
 
     // Camera
     void updateCamera();
+
+    // Helper functions
+    FriendlyNPC* findNearestFriendlyNPC(glm::vec2 position, float range);
 
     // Getters
     Player* getPlayer() { return playerPtr; }

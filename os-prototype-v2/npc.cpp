@@ -1,20 +1,34 @@
-#include "NPC.h"
-#include "GameState.h"
+#pragma once
+#include "Movable.h"
+#include "Timer.h"
 
-NPC::NPC(NPCType type)
-    : Movable(), npcType(type), detectionRange(300.0f),
-    aggroRange(150.0f), target(nullptr), idleTimer(2.0f), actionTimer(1.0f) {
-    // Base initialization
-}
+enum class NPCType {
+    FRIENDLY,
+    HOSTILE,
+    NEUTRAL
+};
 
-NPCType NPC::getNPCType() const {
-    return npcType;
-}
+class NPC : public Movable {
+protected:
+    NPCType npcType;
+    Entity* target;
+    float detectionRange;
+    float aggroRange;
+    Timer idleTimer;
+    Timer actionTimer;
 
-void NPC::setTarget(Entity* newTarget) {
-    target = newTarget;
-}
+public:
+    NPC(NPCType type);
+    virtual ~NPC() = default;
 
-Entity* NPC::getTarget() const {
-    return target;
-}
+    // Pure virtual function - must be implemented by derived classes
+    virtual void onPlayerInteract(class Player* player) = 0;
+
+    // Accessors (now match npc.cpp implementation)
+    NPCType getNPCType() const;
+    void setTarget(Entity* newTarget);
+    Entity* getTarget() const;
+
+    float getDetectionRange() const { return detectionRange; }
+    float getAggroRange() const { return aggroRange; }
+};

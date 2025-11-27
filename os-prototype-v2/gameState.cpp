@@ -3,14 +3,16 @@
 #include "Furniture.h"
 #include "CoordinateSystem.h"
 #include "LevelLoader.h"
+#include "FriendlyNpc.h"
 #include "EnemyNpc.h"
 #include "Projectile.h"
 #include <iostream>
 #include <algorithm>
 
-extern int MAP_ROWS;
-extern int MAP_COLS;
-extern const int TILE_SIZE;
+// Define constants (remove extern declarations)
+const int MAP_ROWS = 25;
+const int MAP_COLS = 25;
+const int TILE_SIZE = 32;
 
 GameState::GameState(SDL_Renderer* renderer, int viewportWidth, int viewportHeight)
     : mode(GameStateMode::PLAYING), playerPtr(nullptr),
@@ -30,7 +32,7 @@ GameState::GameState(SDL_Renderer* renderer, int viewportWidth, int viewportHeig
 
     uiManager = std::make_unique<UIManager>(renderer);
 
-    // Setup UI ability icons
+    // Setup UI ability icons (RESTORED from old version)
     uiManager->addAbilityIcon("Dash", "assets/ui/dash_icon.png", 5.0f);
     uiManager->addAbilityIcon("Melee", "assets/ui/melee_icon.png", 0.6f);
     uiManager->addAbilityIcon("Fireball", "assets/ui/fireball_icon.png", 2.0f);
@@ -49,19 +51,19 @@ void GameState::update(float deltaTime) {
     }
 
     checkCollisions();
-    checkMeleeAttacks();
-    checkEnemyAttacks(); // NEW: Check if enemies hit player
+    checkMeleeAttacks();      // RESTORED from old version
+    checkEnemyAttacks();       // RESTORED from old version
     updateCamera();
     cleanup();
 
-    // Update UI
+    // Update UI (RESTORED from old version)
     uiManager->update(deltaTime, *this);
 
     if (playerPtr && !playerPtr->isActive()) {
         playerPtr = nullptr;
     }
 
-    // Handle level transitions
+    // Handle level transitions (RESTORED from old version)
     if (levelTransitionPending && !nextLevel.empty()) {
         loadLevel(nextLevel);
         levelTransitionPending = false;
@@ -79,7 +81,7 @@ void GameState::render(SDL_Renderer* renderer) {
         }
     }
 
-    // Render UI on top
+    // Render UI on top (RESTORED from old version)
     uiManager->render(*this);
 }
 
@@ -87,7 +89,7 @@ void GameState::checkCollisions() {
     if (!playerPtr) return;
 
     checkPlayerCollisions();
-    checkProjectileCollisions();
+    checkProjectileCollisions();  // RESTORED from old version
 }
 
 void GameState::checkPlayerCollisions() {
@@ -134,7 +136,7 @@ void GameState::checkProjectileCollisions() {
 }
 
 // ============================================================================
-// COMBAT COLLISION DETECTION
+// COMBAT COLLISION DETECTION (RESTORED from old version)
 // ============================================================================
 
 void GameState::checkMeleeAttacks() {
@@ -299,6 +301,14 @@ void GameState::clearLevel() {
     playerPtr = nullptr;
 }
 
+void GameState::loadLevel() {
+    LevelLoader loader;
+    LevelData data = loader.loadLevel("abyss");
+    if (resourceManager) {
+        loader.populateGameState(data, *this, *resourceManager);
+    }
+}
+
 void GameState::loadLevel(const std::string& levelName) {
     clearLevel();
 
@@ -316,4 +326,23 @@ void GameState::loadLevel(const std::string& levelName) {
 void GameState::transitionToLevel(const std::string& levelName) {
     nextLevel = levelName;
     levelTransitionPending = true;
+}
+
+// Find nearest friendly NPC
+FriendlyNPC* GameState::findNearestFriendlyNPC(glm::vec2 position, float range) {
+    FriendlyNPC* nearest = nullptr;
+    float minDist = range;
+
+    if (LAYER_IDX_CHARACTERS < layers.size()) {
+        for (auto& entity : layers[LAYER_IDX_CHARACTERS]) {
+            if (entity->getType() == EntityType::FRIENDLY_NPC && entity->isActive()) {
+                float dist = glm::distance(position, entity->getPosition());
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = static_cast<FriendlyNPC*>(entity.get());
+                }
+            }
+        }
+    }
+    return nearest;
 }

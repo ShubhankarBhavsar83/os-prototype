@@ -1,0 +1,9 @@
+Fetching registry information from https://github.com/microsoft/vcpkg (HEAD)...
+Fetching baseline information from https://github.com/microsoft/vcpkg...
+error: Failed to fetch https://github.com/microsoft/vcpkg.
+error: failed to fetch ref 33b6329c9966d557f92ff457c152d19207e40d89 from repository https://github.com/microsoft/vcpkg
+failed to execute: "C:\Program Files\Git\cmd\git.exe" "--git-dir=C:\Users\shrey\AppData\Local\vcpkg\registries\git\.git" "--work-tree=C:\Users\shrey\AppData\Local\vcpkg\registries\git" -c core.autocrlf=false fetch --update-shallow -- https://github.com/microsoft/vcpkg 33b6329c9966d557f92ff457c152d19207e40d89
+error: git failed with exit code: (128).
+fatal: remote error: upload-pack: not our ref 33b6329c9966d557f92ff457c152d19207e40d89
+
+while loading baseline version for curl

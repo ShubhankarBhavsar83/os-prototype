@@ -31,7 +31,8 @@ Player::Player()
     maxSpeedX = 50.0f;
     maxSpeedY = 50.0f;
 
-    collider = Collider(49.0f * scale, 45.0f * scale, 39.0f * scale, 39.0f * scale);
+    collider = Collider(49.0f * scale, 45.0f * scale, 39.0f * scale, 39.0f * scale, true);
+
 }
 
 void Player::update(float deltaTime, GameState& gs) {
@@ -399,6 +400,15 @@ void Player::handleCollision(Entity* other) {
 }
 
 void Player::handleInput(const bool* keyState, GameState& gs) {
+
+    if (FriendlyNPC::activeChatNPC != nullptr) {
+        // Stop the player completely
+        velocity = glm::vec2(0, 0);
+        acceleration = glm::vec2(0, 0);
+
+        // Return early so no movement keys are processed
+        return;
+    }
     current_acceleration = glm::vec2(0.0f, 0.0f);
 
     struct MoveDirectionSet {

@@ -34,15 +34,16 @@ protected:
 
     float spriteWidth;
     float spriteHeight;
-    
+
     bool solid;
     bool active;
-    Collider collider;
+
 
     int currentAnimation;
     int verticalSpriteIndex;
 
 public:
+    Collider collider;
     float scale;
     SDL_Texture* texture;
     std::vector<Animation> animations;
